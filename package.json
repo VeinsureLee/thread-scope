@@ -1,0 +1,34 @@
+{
+  "name": "thread-scope",
+  "version": "1.0.0",
+  "description": "An MCP service for incremental forum content crawling",
+  "main": "index.js",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx src/index.ts",
+    "build": "tsc",
+    "start": "node build/index.js",
+    "inspect": "npm run build && npx @modelcontextprotocol/inspector node build/index.js",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "keywords": [],
+  "author": "Veinsure Lee",
+  "license": "ISC",
+  "dependencies": {
+    "@modelcontextprotocol/server": "^2.0.0",
+    "axios": "^1.19.0",
+    "cheerio": "^1.2.0",
+    "dotenv": "^17.4.2",
+    "iconv-lite": "^0.6.3",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/iconv-lite": "^0.0.1",
+    "@types/node": "^26.1.2",
+    "tsx": "^4.23.5",
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.10"
+  }
+}
