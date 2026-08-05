@@ -8,13 +8,15 @@ import type { SectionNode, ForumTreeNode, Board } from "../utils/types.js";
 // ============================================================
 
 /**
- * AJAX 响应中的原始条目
- * id 为纯数字 → 版块（leaf）
- * id 为非数字 → 分区（branch，可继续递归）
+ * AJAX 响应中的原始条目。
+ *
+ * 通过 t 字段 <a> 的 href 判断节点类型：
+ *   /board/{ename}   → 版块（leaf）
+ *   /section/{id}    → 分区（branch，可继续递归）
  */
 interface AjaxEntry {
-  t: string;  // HTML 片段，例如 '<a href="...">名称</a>'
-  id: string; // 数字字符串 = 版块；非数字 = 分区
+  t: string;  // HTML 片段，例如 '<a href="/board/Advice">意见与建议</a>'
+  id: string; // AJAX 中 child 的 id 属性（非递归 key，仅作参考）
 }
 
 /**
@@ -29,27 +31,37 @@ async function fetchChildNodes(parentId: string): Promise<AjaxEntry[]> {
 }
 
 // ============================================================
-// 节点识别
+// 节点识别（基于 href 而非 id）
 // ============================================================
 
-const BOARD_ID_PATTERN = new RegExp(selectors.section_ajax.board_id_pattern);
-const BOARD_ID_REGEX = new RegExp(selectors.section_ajax.board_id_regex);
+const HREF_REGEX = new RegExp(selectors.section_ajax.href_regex);
 
-/** 判断 AJAX 返回的 id 是否为版块（纯数字 = leaf） */
-function isBoard(id: string): boolean {
-  return BOARD_ID_PATTERN.test(id);
+/** 从 t 字段 HTML 中提取 href 属性值 */
+function extractHref(t: string): string {
+  const m = t.match(HREF_REGEX);
+  return m ? m[1]! : "";
+}
+
+/** 判断 t 字段的 href 是否指向版块（/board/xxx） */
+function isBoardHref(href: string): boolean {
+  return href.includes(selectors.section_ajax.board_href_keyword);
+}
+
+/** 判断 t 字段的 href 是否指向分区（/section/xxx） */
+function isSectionHref(href: string): boolean {
+  return href.includes(selectors.section_ajax.section_href_keyword);
+}
+
+/** 从 /board/{ename} href 中提取版块英文名 */
+function extractBoardEname(href: string): string {
+  const m = href.match(/\/board\/(.+)/);
+  return m ? m[1]! : "";
 }
 
 /** 从 t 字段的 HTML 中提取中文名称 */
 function extractName(t: string): string {
   const m = t.match(selectors.section_ajax.name_regex);
   return m ? m[1]! : t;
-}
-
-/** 从版块 id 字符串提取数字部分 */
-function extractBoardId(id: string): string {
-  const m = id.match(BOARD_ID_REGEX);
-  return m ? m[0]! : id;
 }
 
 // ============================================================
@@ -130,15 +142,21 @@ async function batchFetchBoardDetails(
 /**
  * 递归爬取论坛树状结构。
  *
- * 算法：
+ * 算法（基于 href 判断节点类型）：
  * 1. AJAX 获取 parentId 下的所有条目
- * 2. 分离 section（非数字 id）和 board（数字 id）
- * 3. 对 board 条目批量请求 HTML 获取详细统计
- * 4. 对 section 条目递归调用 crawlNodeTree
+ * 2. 解析 t 字段 HTML 中的 href：
+ *    - 包含 /board/   → 版块叶子节点
+ *    - 包含 /section/ → 分区节点（递归）
+ * 3. 对版块条目批量请求 HTML 获取详细统计
+ * 4. 对分区条目递归调用 crawlNodeTree
  *
  * @param parentId "list-section" = 根级
+ * @param depth     当前递归深度（0 = 根层级）
  */
-async function crawlNodeTree(parentId: string): Promise<ForumTreeNode[]> {
+async function crawlNodeTree(
+  parentId: string,
+  depth: number = 0,
+): Promise<ForumTreeNode[]> {
   const entries = await fetchChildNodes(parentId);
   const result: ForumTreeNode[] = [];
 
@@ -149,11 +167,14 @@ async function crawlNodeTree(parentId: string): Promise<ForumTreeNode[]> {
   for (const entry of entries) {
     const name = extractName(entry.t);
     if (!name || !name.trim()) continue; // 跳过空条目
-    if (isBoard(entry.id)) {
+
+    const href = extractHref(entry.t);
+    if (isBoardHref(href)) {
       boardEntries.push(entry);
-    } else {
+    } else if (isSectionHref(href)) {
       sectionEntries.push(entry);
     }
+    // href 无法识别 → 跳过（不是可处理的节点）
   }
 
   // ── 处理版块（叶子） ──
@@ -162,10 +183,10 @@ async function crawlNodeTree(parentId: string): Promise<ForumTreeNode[]> {
     try {
       boards = await batchFetchBoardDetails(parentId, boardEntries);
     } catch {
-      // HTML 解析失败，退化为基本版块
+      // HTML 解析失败，退化为基本信息
       boards = boardEntries.map((entry) => ({
         name: extractName(entry.t),
-        ename: `(${extractName(entry.t)})`,
+        ename: extractBoardEname(extractHref(entry.t)) || `(${extractName(entry.t)})`,
         manager: "",
         posts: "",
         threads: "",
@@ -177,6 +198,7 @@ async function crawlNodeTree(parentId: string): Promise<ForumTreeNode[]> {
         id: `board-${board.ename.replace(/[()]/g, "")}`,
         name: board.name,
         type: "board",
+        level: depth + 1,
         board,
       });
     }
@@ -185,19 +207,24 @@ async function crawlNodeTree(parentId: string): Promise<ForumTreeNode[]> {
   // ── 处理子分区（递归） ──
   for (const entry of sectionEntries) {
     const name = extractName(entry.t);
+    // 递归参数使用 AJAX 返回的 id 字段（如 "sec-0", "sec-BBSLOG"），
+    // 而非从 href 提取的值（href 仅用于类型判断）
+    const childId = entry.id;
     try {
-      const children = await crawlNodeTree(entry.id);
+      const children = await crawlNodeTree(childId, depth + 1);
       result.push({
-        id: entry.id,
+        id: childId,
         name,
         type: "section",
+        level: depth + 1,
         children,
       });
     } catch {
       result.push({
-        id: entry.id,
+        id: childId,
         name,
         type: "section",
+        level: depth + 1,
         children: [],
       });
     }
@@ -224,20 +251,11 @@ async function crawlNodeTree(parentId: string): Promise<ForumTreeNode[]> {
  * //   ]
  * // }
  */
-export async function fetchForumTree(): Promise<SectionNode[]> {
+export async function fetchForumTree(): Promise<ForumTreeNode[]> {
   requireLogin();
 
   const nodes = await crawlNodeTree(routes.tree_root_param);
-  // 根层级都应该是 SectionNode；遇到 BoardNode 则包装
-  return nodes.map((n) => {
-    if (n.type === "section") return n as SectionNode;
-    return {
-      id: n.id,
-      name: n.name,
-      type: "section" as const,
-      children: [n],
-    };
-  });
+  return nodes;
 }
 
 /**
@@ -262,7 +280,10 @@ export async function fetchSections(): Promise<{ id: string; name: string }[]> {
   requireLogin();
   const entries = await fetchChildNodes(routes.tree_root_param);
   return entries
-    .map((e) => ({ id: e.id, name: extractName(e.t) }))
+    .map((e) => {
+      const href = extractHref(e.t);
+      return { id: href.replace(/\/section\//, "").trim() || e.id, name: extractName(e.t) };
+    })
     .filter((s) => s.name);
 }
 
@@ -274,19 +295,22 @@ export async function fetchBoardsInSection(
 ): Promise<Board[]> {
   requireLogin();
   const entries = await fetchChildNodes(sectionId);
-  const boards = entries.filter((e) => isBoard(e.id));
+  const boardEntries = entries.filter((e) => {
+    const href = extractHref(e.t);
+    return isBoardHref(href);
+  });
 
-  if (boards.length > 0) {
+  if (boardEntries.length > 0) {
     try {
-      return await batchFetchBoardDetails(sectionId, boards);
+      return await batchFetchBoardDetails(sectionId, boardEntries);
     } catch {
       // fall through
     }
   }
 
-  return boards.map((e) => ({
+  return boardEntries.map((e) => ({
     name: extractName(e.t),
-    ename: `(${extractName(e.t)})`,
+    ename: extractBoardEname(extractHref(e.t)) || `(${extractName(e.t)})`,
     manager: "",
     posts: "",
     threads: "",

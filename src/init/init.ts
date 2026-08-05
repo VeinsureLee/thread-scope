@@ -1,13 +1,11 @@
 import { requireLogin } from "../auth/auth.js";
 import { fetchForumTree } from "../crawl/structure.js";
-import { fetchBoardArticles } from "../crawl/articles.js";
 import { writeJson } from "../storage/store.js";
-import type { ForumStructure, SectionNode } from "../utils/types.js";
+import type { ForumStructure, ForumTreeNode } from "../utils/types.js";
 
 export interface InitResult {
   sections: number;
   boards: number;
-  articles: number;
   errors: string[];
 }
 
@@ -17,8 +15,15 @@ export interface InitResult {
  * 流程：
  * 1. 检查登录状态
  * 2. 递归爬取完整树状结构 → 保存 forum-structure.json
- * 3. 遍历树中所有版块，爬取首页文章 → 保存 board-{name}.json
  *
+ * 树状层级说明：
+ *   第 1 层（level 1）：根级讨论区（如"校园生活"、"学术天地"）
+ *   第 2 层（level 2）：二级目录（如"院系风采"下的子分类），也可能是版面（叶节点）
+ *   第 3 层（level 3）：三级目录（更深嵌套），也可能是版面（叶节点）
+ *   ...
+ *   叶节点：版面（board），type="board"，包含版面基本信息
+ *
+ * 暂不爬取版面首页文章内容，仅保存树状结构。
  * 需要先执行 forum-login。
  */
 export async function initForum(): Promise<InitResult> {
@@ -27,17 +32,15 @@ export async function initForum(): Promise<InitResult> {
   const errors: string[] = [];
   let totalSections = 0;
   let totalBoards = 0;
-  let totalArticles = 0;
 
   // ── 1. 爬取论坛完整树 ──
-  let tree: SectionNode[];
+  let tree: ForumTreeNode[];
   try {
     tree = await fetchForumTree();
   } catch (err) {
     return {
       sections: 0,
       boards: 0,
-      articles: 0,
       errors: [`论坛结构爬取失败: ${String(err)}`],
     };
   }
@@ -48,48 +51,22 @@ export async function initForum(): Promise<InitResult> {
   };
   writeJson("forum-structure.json", forumStructure);
 
-  // ── 2. 遍历树统计 ──
-  function walkTree(nodes: SectionNode[]) {
+  // ── 2. 遍历树统计各层级 ──
+  function walkTree(nodes: ForumTreeNode[], depth: number = 0) {
     for (const node of nodes) {
-      totalSections++;
-      for (const child of node.children) {
-        if (child.type === "board") {
-          totalBoards++;
-        } else {
-          walkTree([child as SectionNode]);
-        }
+      if (node.type === "section") {
+        totalSections++;
+        walkTree(node.children, depth + 1);
+      } else {
+        totalBoards++;
       }
     }
   }
   walkTree(tree);
 
-  // ── 3. 爬取每个版块的文章 ──
-  async function crawlArticles(nodes: SectionNode[]) {
-    for (const node of nodes) {
-      for (const child of node.children) {
-        if (child.type === "board") {
-          const bd = child.board;
-          const ename = bd.ename.replace(/[()]/g, "");
-          try {
-            const articles = await fetchBoardArticles(ename);
-            writeJson(`board-${ename}.json`, articles);
-            totalArticles += articles.length;
-          } catch (err) {
-            const msg = `版块 [${bd.name}] 文章爬取失败: ${String(err)}`;
-            errors.push(msg);
-          }
-        } else {
-          await crawlArticles([child as SectionNode]);
-        }
-      }
-    }
-  }
-  await crawlArticles(tree);
-
   return {
     sections: totalSections,
     boards: totalBoards,
-    articles: totalArticles,
     errors,
   };
 }

@@ -62,9 +62,9 @@ export const routes = loadYaml<RoutesConfig>("rules/routes.yaml");
 export interface SelectorsConfig {
   section_ajax: {
     name_regex: string;
-    board_id_pattern: string;
-    board_id_regex: string;
-    count_param: string;
+    href_regex: string;
+    board_href_keyword: string;
+    section_href_keyword: string;
   };
   board_list: {
     row_selector: string;

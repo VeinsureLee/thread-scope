@@ -7,12 +7,14 @@
 
 # ── 分区 AJAX JSON 响应（/section/ajax_list.json） ──
 # 返回 [{ t: "<a href='...'>名称</a>", id: "..." }, ...]
-# id 为纯数字 → 版块叶子节点
-# id 为非数字 → 子分区（可继续递归）
+# 通过 t 字段中 <a> 的 href 判断节点类型：
+#   /board/{ename}  → 版块（叶子，leaf）
+#   /section/{id}   → 分区（分支，branch，可继续递归）
 section_ajax:
   name_regex: ">(.+?)<"                        # 从 t 字段 HTML 中提取中文名称
-  board_id_pattern: "^\\d+$"                   # 纯数字 id 正则 → 版块节点
-  board_id_regex: "\\d+"                        # 从 id 提取数字部分
+  href_regex: 'href="([^"]*)"'                 # 从 t 字段 HTML 中提取 href
+  board_href_keyword: "/board/"                # href 中包含 /board/ → 版块节点
+  section_href_keyword: "/section/"            # href 中包含 /section/ → 分区节点
 
 # ── 版块列表 HTML（/section/{id}?count=1） ──
 board_list:

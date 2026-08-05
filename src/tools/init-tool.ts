@@ -17,7 +17,6 @@ export function registerInitTool(server: McpServer): void {
       const lines = [
         `分区: ${result.sections}`,
         `版块: ${result.boards}`,
-        `文章: ${result.articles}`,
       ];
       if (result.errors.length > 0) {
         lines.push(`失败: ${result.errors.length} 个`);

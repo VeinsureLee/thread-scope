@@ -1,22 +1,41 @@
 import { describe, it, expect } from "vitest";
 
 /**
- * 单元测试：验证 AJAX 节点识别逻辑（无需网络）。
+ * 单元测试：验证基于 href 的节点识别逻辑（无需网络）。
  *
  * 测试指标：
- * - board_id_pattern 正则对纯数字/非数字 id 的判定
+ * - href 正则从 t 字段 HTML 中提取 href
+ * - /board/  pattern 判断版块叶子节点
+ * - /section/ pattern 判断分区分支节点
  * - name_regex 从 t 字段 HTML 中提取名称
- * - board_id_regex 从 id 提取数字部分
  */
 
 // 从 selectors.yaml 复制规则值（防止 YAML 加载依赖）
-const BOARD_ID_PATTERN = /^\d+$/;
-const BOARD_ID_REGEX = /\d+/;
+const HREF_REGEX = /href="([^"]*)"/;
+const BOARD_HREF_KEYWORD = "/board/";
+const SECTION_HREF_KEYWORD = "/section/";
 const NAME_REGEX = />(.+?)</;
 
-/** 模拟 isBoard 逻辑 */
-function isBoard(id: string): boolean {
-  return BOARD_ID_PATTERN.test(id);
+/** 从 t 字段 HTML 中提取 href 属性值 */
+function extractHref(t: string): string {
+  const m = t.match(HREF_REGEX);
+  return m ? m[1]! : "";
+}
+
+/** 判断 href 是否指向版块 */
+function isBoardHref(href: string): boolean {
+  return href.includes(BOARD_HREF_KEYWORD);
+}
+
+/** 判断 href 是否指向分区 */
+function isSectionHref(href: string): boolean {
+  return href.includes(SECTION_HREF_KEYWORD);
+}
+
+/** 从 /board/{ename} href 中提取版块英文名 */
+function extractBoardEname(href: string): string {
+  const m = href.match(/\/board\/(.+)/);
+  return m ? m[1]! : "";
 }
 
 /** 模拟 extractName 逻辑 */
@@ -25,30 +44,63 @@ function extractName(t: string): string {
   return m ? m[1]! : t;
 }
 
-/** 模拟 extractBoardId 逻辑 */
-function extractBoardId(id: string): string {
-  const m = id.match(BOARD_ID_REGEX);
-  return m ? m[0]! : id;
-}
-
 describe("论坛树结构 — 节点识别", () => {
-  // ── 版块 vs 分区判断 ──
-  describe("isBoard（id 类型判断）", () => {
-    it('纯数字 id → 版块 (leaf)', () => {
-      expect(isBoard("123")).toBe(true);
-      expect(isBoard("0")).toBe(true);
-      expect(isBoard("987654321")).toBe(true);
+  // ── href 提取 ──
+  describe("extractHref（从 t 字段 HTML 提取 href）", () => {
+    it('提取 /board/xxx href', () => {
+      expect(extractHref('<a href="/board/Advice">意见与建议</a>'))
+        .toBe("/board/Advice");
     });
 
-    it('非数字 id → 分区 (branch)', () => {
-      expect(isBoard("news")).toBe(false);
-      expect(isBoard("section-abc")).toBe(false);
-      expect(isBoard("list-section")).toBe(false);
+    it('提取 /section/xxx href', () => {
+      expect(extractHref('<a href="/section/sec-0">本站站务</a>'))
+        .toBe("/section/sec-0");
     });
 
-    it('含数字但不纯 → 分区', () => {
-      expect(isBoard("sec123")).toBe(false);
-      expect(isBoard("123abc")).toBe(false);
+    it('无 href 时返回空字符串', () => {
+      expect(extractHref("纯文本")).toBe("");
+    });
+  });
+
+  // ── 版块 vs 分区判断（基于 href） ──
+  describe("isBoardHref / isSectionHref（href 路径判断）", () => {
+    it('/board/xxx → 版块 (leaf)', () => {
+      expect(isBoardHref("/board/Advice")).toBe(true);
+      expect(isBoardHref("/board/BBShelp")).toBe(true);
+      expect(isBoardHref("/board/JobInfo")).toBe(true);
+    });
+
+    it('/section/xxx → 分区 (branch)', () => {
+      expect(isSectionHref("/section/sec-0")).toBe(true);
+      expect(isSectionHref("/section/news")).toBe(true);
+    });
+
+    it('/board/ 不是分区', () => {
+      expect(isSectionHref("/board/Advice")).toBe(false);
+    });
+
+    it('/section/ 不是版块', () => {
+      expect(isBoardHref("/section/sec-0")).toBe(false);
+    });
+
+    it('空 href 两者均 false', () => {
+      expect(isBoardHref("")).toBe(false);
+      expect(isSectionHref("")).toBe(false);
+    });
+  });
+
+  // ── 版块英文名提取 ──
+  describe("extractBoardEname（从 href 提取英文名）", () => {
+    it('提取 /board/Advice → Advice', () => {
+      expect(extractBoardEname("/board/Advice")).toBe("Advice");
+    });
+
+    it('多级路径只取第一段', () => {
+      expect(extractBoardEname("/board/BBShelp/sub")).toBe("BBShelp/sub");
+    });
+
+    it('无 /board/ 返回空', () => {
+      expect(extractBoardEname("/section/sec-0")).toBe("");
     });
   });
 
@@ -57,8 +109,8 @@ describe("论坛树结构 — 节点识别", () => {
     it('提取 a 标签文本', () => {
       expect(extractName('<a href="/section/news">校园生活</a>'))
         .toBe("校园生活");
-      expect(extractName('<a href="/board/example">招聘信息</a>'))
-        .toBe("招聘信息");
+      expect(extractName('<a href="/board/Advice">意见与建议</a>'))
+        .toBe("意见与建议");
     });
 
     it('无 a 标签时返回原始字符串', () => {
@@ -73,21 +125,6 @@ describe("论坛树结构 — 节点识别", () => {
         .toBe('<font color="red">热点');
     });
   });
-
-  // ── 版块 ID 提取 ──
-  describe("extractBoardId（提取数字 ID）", () => {
-    it('从 "board/123" 提取数字部分', () => {
-      expect(extractBoardId("board/123")).toBe("123");
-    });
-
-    it('纯数字直接返回', () => {
-      expect(extractBoardId("456")).toBe("456");
-    });
-
-    it('无数字时返回原值', () => {
-      expect(extractBoardId("abc")).toBe("abc");
-    });
-  });
 });
 
 describe("论坛树结构 — 递归逻辑", () => {
@@ -99,7 +136,7 @@ describe("论坛树结构 — 递归逻辑", () => {
 
   /**
    * 模拟 crawlNodeTree 的核心逻辑：
-   * 将 entries 按 isBoard 分成两个数组。
+   * 解析每个 entry 的 href，按 /board/ 或 /section/ 分类。
    */
   function classifyNodes(entries: MockEntry[]) {
     const sections: MockEntry[] = [];
@@ -107,13 +144,15 @@ describe("论坛树结构 — 递归逻辑", () => {
 
     for (const entry of entries) {
       const name = extractName(entry.t);
-      // 跳过空名称：无内容或纯空白
       if (!name || !name.trim()) continue;
-      if (isBoard(entry.id)) {
+
+      const href = extractHref(entry.t);
+      if (isBoardHref(href)) {
         boards.push(entry);
-      } else {
+      } else if (isSectionHref(href)) {
         sections.push(entry);
       }
+      // href 无法识别 → 跳过（非可处理节点）
     }
 
     return { sections, boards };
@@ -127,34 +166,35 @@ describe("论坛树结构 — 递归逻辑", () => {
 
   it("全部是版块 → boards 收集，sections 为空", () => {
     const entries: MockEntry[] = [
-      { t: '<a href="/board/a">版块A</a>', id: "1" },
-      { t: '<a href="/board/b">版块B</a>', id: "2" },
-      { t: '<a href="/board/c">版块C</a>', id: "3" },
+      { t: '<a href="/board/Advice">版块A</a>', id: "" },
+      { t: '<a href="/board/BBShelp">版块B</a>', id: "" },
+      { t: '<a href="/board/JobInfo">版块C</a>', id: "" },
     ];
     const { sections, boards } = classifyNodes(entries);
     expect(boards).toHaveLength(3);
     expect(sections).toHaveLength(0);
+    expect(extractBoardEname(extractHref(entries[0]!.t))).toBe("Advice");
   });
 
   it("混合分区和版块 → 正确分离", () => {
     const entries: MockEntry[] = [
-      { t: '<a href="/section/sub">子分区</a>', id: "sub-sec" },
-      { t: '<a href="/board/a">版块A</a>', id: "1" },
-      { t: '<a href="/board/b">版块B</a>', id: "2" },
-      { t: '<a href="/section/nest">嵌套区</a>', id: "nest" },
+      { t: '<a href="/section/sec-1">子分区A</a>', id: "sec-1" },
+      { t: '<a href="/board/Advice">版块A</a>', id: "" },
+      { t: '<a href="/board/BBShelp">版块B</a>', id: "" },
+      { t: '<a href="/section/nest">子分区B</a>', id: "nest" },
     ];
     const { sections, boards } = classifyNodes(entries);
     expect(sections).toHaveLength(2);
-    expect(extractName(sections[0]!.t)).toBe("子分区");
-    expect(extractName(sections[1]!.t)).toBe("嵌套区");
+    expect(extractName(sections[0]!.t)).toBe("子分区A");
+    expect(extractName(sections[1]!.t)).toBe("子分区B");
     expect(boards).toHaveLength(2);
   });
 
   it("跳过空名称条目", () => {
     const entries: MockEntry[] = [
-      { t: "", id: "1" },
-      { t: '<a href="/board/a">版块A</a>', id: "2" },
-      { t: "   ", id: "3" },
+      { t: "", id: "" },
+      { t: '<a href="/board/Advice">版块A</a>', id: "" },
+      { t: "   ", id: "" },
     ];
     const { sections, boards } = classifyNodes(entries);
     expect(boards).toHaveLength(1);
@@ -164,10 +204,20 @@ describe("论坛树结构 — 递归逻辑", () => {
   it("大量版块（50+）可正确分类", () => {
     const entries: MockEntry[] = Array.from({ length: 60 }, (_, i) => ({
       t: `<a href="/board/b${i}">版块${i}</a>`,
-      id: String(i),
+      id: "",
     }));
     const { sections, boards } = classifyNodes(entries);
     expect(boards).toHaveLength(60);
+    expect(sections).toHaveLength(0);
+  });
+
+  it("无法识别的 href 被跳过（既非 /board/ 也非 /section/）", () => {
+    const entries: MockEntry[] = [
+      { t: '<a href="/other/unknown">未知</a>', id: "1" },
+      { t: '<a href="/board/Advice">版块A</a>', id: "" },
+    ];
+    const { sections, boards } = classifyNodes(entries);
+    expect(boards).toHaveLength(1);
     expect(sections).toHaveLength(0);
   });
 });

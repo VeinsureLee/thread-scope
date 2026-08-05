@@ -21,14 +21,21 @@ export interface Board {
 /**
  * 论坛结构树节点。
  *
- * 树的结构类型：
- *   type: "section" → children 可以是 SectionNode[]（子分区）或 Board[]
- *   type: "board"   → 叶子节点，包含版块详情
+ * 节点类型：
+ *   type: "section" → 分区/讨论区（branch），可包含子分区或版块
+ *   type: "board"   → 版面（leaf），包含版面详情
+ *
+ * section 的 level 表示嵌套深度：
+ *   level 1 → 一级讨论区（根分组下）
+ *   level 2 → 二级讨论区
+ *   level N → N 级讨论区
  */
 export interface SectionNode {
   id: string;
   name: string;
   type: "section";
+  /** 嵌套深度，1 = 一级讨论区，2 = 二级讨论区，... */
+  level: number;
   children: ForumTreeNode[];
 }
 
@@ -37,6 +44,8 @@ export interface BoardNode {
   id: string;
   name: string;
   type: "board";
+  /** 嵌套深度，1 = 一级讨论区下的版面，2 = 二级目录下的版面，... */
+  level: number;
   board: Board;
 }
 
@@ -46,7 +55,7 @@ export type ForumTreeNode = SectionNode | BoardNode;
 /** 论坛结构汇总（init 产出） */
 export interface ForumStructure {
   crawledAt: string;
-  tree: SectionNode[];
+  tree: ForumTreeNode[];
 }
 
 /** 文章（article），版块中的帖子 */
