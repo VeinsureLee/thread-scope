@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { decodeBody } from "../../src/utils/encoding.js";
+import { decodeBody } from "../../src/core/encoding.js";
 
 /**
  * 构造最简 Mock，模拟 AxiosResponse 中 decodeBody 用到的部分

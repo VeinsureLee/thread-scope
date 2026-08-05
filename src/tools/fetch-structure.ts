@@ -4,7 +4,7 @@ import { requireLogin } from "../auth/auth.js";
 import {
   fetchForumTree,
   fetchNodeChildren,
-} from "../crawl/structure.js";
+} from "../crawl/structure/index.js";
 
 /**
  * 注册论坛结构爬取工具。

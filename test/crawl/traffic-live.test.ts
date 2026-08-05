@@ -5,11 +5,11 @@
  */
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { login, logout } from "../../src/auth/auth.js";
-import { ajaxGet } from "../../src/utils/http-client.js";
-import { routes, fillRoute } from "../../src/utils/config.js";
-import { fetchForumTree } from "../../src/crawl/structure.js";
-import { fetchTraffic, parseSectionTraffic } from "../../src/crawl/traffic.js";
-import type { ForumTreeNode, BoardNode } from "../../src/utils/types.js";
+import { ajaxGet } from "../../src/core/http-client.js";
+import { routes, fillRoute } from "../../src/core/config.js";
+import { fetchForumTree } from "../../src/crawl/structure/index.js";
+import { fetchTraffic, parseSectionTraffic } from "../../src/crawl/traffic/index.js";
+import type { ForumTreeNode, BoardNode } from "../../src/models/index.js";
 
 describe("live: traffic for qiaoqiaohua (IWhisper)", () => {
   beforeAll(async () => {

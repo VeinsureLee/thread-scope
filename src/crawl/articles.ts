@@ -1,8 +1,8 @@
 import { load } from "cheerio";
-import { routes, selectors, fillRoute } from "../utils/config.js";
-import { ajaxGet } from "../utils/http-client.js";
+import { routes, selectors, fillRoute } from "../core/config.js";
+import { ajaxGet } from "../core/http-client.js";
 import { requireLogin } from "../auth/auth.js";
-import type { Article } from "../utils/types.js";
+import type { Article } from "../models/index.js";
 
 /**
  * 爬取指定版块的文章列表（首页前 30 篇）。

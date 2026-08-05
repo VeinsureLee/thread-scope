@@ -1,7 +1,7 @@
 import type { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
 import { requireLogin } from "../auth/auth.js";
-import { fetchTraffic } from "../crawl/traffic.js";
+import { fetchTraffic } from "../crawl/traffic/index.js";
 
 /** 注册获取流量信息工具 */
 export function registerFetchTrafficTool(server: McpServer): void {

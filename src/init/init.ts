@@ -1,7 +1,7 @@
 import { requireLogin } from "../auth/auth.js";
-import { fetchForumTree } from "../crawl/structure.js";
+import { fetchForumTree } from "../crawl/structure/index.js";
 import { writeJson } from "../storage/store.js";
-import type { ForumStructure, ForumTreeNode } from "../utils/types.js";
+import type { ForumStructure, ForumTreeNode } from "../models/index.js";
 
 export interface InitResult {
   sections: number;

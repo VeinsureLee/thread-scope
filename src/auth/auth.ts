@@ -5,8 +5,8 @@ import {
   routes,
   loginRules,
   secrets,
-} from "../utils/config.js";
-import { saveCookie, getCookie, clearCookie } from "../utils/http-client.js";
+} from "../core/config.js";
+import { saveCookie, getCookie, clearCookie } from "../core/http-client.js";
 
 // ========== 类型 ==========
 

@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { requireLogin, logout } from "../../src/auth/auth.js";
-import { getCookie, saveCookie } from "../../src/utils/http-client.js";
+import { getCookie, saveCookie } from "../../src/core/http-client.js";
 
 describe("认证守卫 (auth)", () => {
   beforeEach(() => {
