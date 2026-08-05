@@ -1,0 +1,36 @@
+# ============================================================
+# 通用规则 — CSS 选择器
+# ============================================================
+# 本文件定义论坛各页面 HTML 解析时使用的 CSS 选择器。
+# 如果论坛改版（模板/样式变更），只需修改此文件。
+# ============================================================
+
+# ── 分区 AJAX JSON 响应（/section/ajax_list.json） ──
+# 返回 [{ t: "<a href='...'>名称</a>", id: "..." }, ...]
+# id 为纯数字 → 版块叶子节点
+# id 为非数字 → 子分区（可继续递归）
+section_ajax:
+  name_regex: ">(.+?)<"                        # 从 t 字段 HTML 中提取中文名称
+  board_id_pattern: "^\\d+$"                   # 纯数字 id 正则 → 版块节点
+  board_id_regex: "\\d+"                        # 从 id 提取数字部分
+
+# ── 版块列表 HTML（/section/{id}?count=1） ──
+board_list:
+  row_selector: "table.board-list tbody tr"
+  name: ".title_1 a"                           # 版块中文名（a 标签文本）
+  ename: ".title_1"                            # 版块英文名（从 title_1 全文中提取）
+  manager: ".title_2"                          # 版主信息
+  threads: ".title_6"                          # 主题数
+  posts: ".title_7"                            # 帖子数
+
+# ── 版块统计（/section/{id}?count=1 HTML 中额外出现的列） ──
+board_stats:
+  online_users: ".title_8"                     # 当前在线人数
+
+# ── 文章列表页（/board/{name}） ──
+article_list:
+  row_selector: "table.board-list tbody tr, table.t-con tbody tr"
+  title_normal: ".title_9 a"                   # 普通帖标题
+  title_pinned: ".title_3 a"                   # 置顶/公告帖标题
+  author_link: 'a[href*="/user/query/"]'        # 作者链接（按 href 匹配）
+  date_regex: '\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}'  # 日期时间正则

@@ -2,23 +2,17 @@
 node_modules/
 build/
 
-# ── 敏感信息（账号密码、Cookie、爬取数据）──
+# ── 敏感信息（账号密码、运行时数据）──
 .env
 data/
 output/
 *.db
 *.sqlite
 
-# ── 本地配置（可能含论坛地址等细节）──
-config/config.yaml
-
-# ── 论坛爬取原始数据（不应泄露）──
+# ── 爬取原始数据（不应泄露）──
 *.html
 section*.json
 board*.json
-
-# ── 本地配置（可能含论坛地址等细节）──
-config/config.yaml
 
 # ── 编辑器与 IDE ──
 .idea/
@@ -36,6 +30,3 @@ Thumbs.db
 
 # ── Claude Code ──
 .claude/
-
-# ── 环境变量示例（可提交，不含真实密码）──
-# .env.example 已纳入版本控制，勿加到这里

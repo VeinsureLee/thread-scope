@@ -1,0 +1,31 @@
+# ============================================================
+# 通用规则 — 论坛路由模板
+# ============================================================
+# 本文件描述论坛各功能页面的 URL 路径模板。
+# 花括号 {xxx} 表示运行时替换的变量，由程序拼接。
+# 修改此文件即可适配同版本论坛的路径变更，无需改源码。
+# ============================================================
+
+# ── 认证 ──
+index: "/index"                                 # 首页（获取 guest cookie）
+login: "/user/ajax_login.json"                  # AJAX 登录接口（POST）
+
+# ── 论坛浏览 ──
+# 分区 AJAX 接口：递归获取树状结构
+#   root=list-section → 根级（一级讨论区）
+#   root={parentId}   → 该区下的子节点（可能是子讨论区或版块）
+sections_ajax: "/section/ajax_list.json"         # AJAX 分区/子区/版块列表（JSON）
+section_detail: "/section/{sectionId}"           # 分区/版块详情页（HTML）
+
+# ── 版块文章 ──
+board_articles: "/board/{boardName}"             # 版块文章列表页
+
+# ── 用户相关（用于页面解析时的链接匹配） ──
+user_query: "/user/query/"                      # 用户信息页前缀
+
+# ── 分区树递归参数 ──
+tree_root_param: "list-section"                  # 根级参数值：root=list-section
+tree_recursive_param: "root"                     # 递归参数名：root={parentId}
+
+# ── 版块流量（可选 &count=1 参数） ──
+count_param: "&count=1"                         # 附加此参数时返回 HTML（含流量）

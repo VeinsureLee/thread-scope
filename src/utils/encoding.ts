@@ -1,5 +1,6 @@
 import type { AxiosResponse } from "axios";
 import iconv from "iconv-lite";
+import { http } from "./config.js";
 
 /**
  * 解码 axios 响应体，自动处理 GBK / UTF-8 等编码。
@@ -7,7 +8,7 @@ import iconv from "iconv-lite";
  * 优先级：
  * 1. 响应头 Content-Type 中的 charset
  * 2. HTML <meta charset> 标签
- * 3. 默认回退到 GBK（目标论坛默认编码）
+ * 3. 默认回退到配置的默认编码（config/rules/http.yaml）
  */
 export function decodeBody(resp: AxiosResponse): string {
   const buf = Buffer.from(resp.data);
@@ -29,6 +30,6 @@ export function decodeBody(resp: AxiosResponse): string {
     return buf.toString("utf-8");
   }
 
-  // 4. 其他编码（包括未检测到的情况）使用 iconv-lite 解码，默认 GBK
-  return iconv.decode(buf, enc || "gbk");
+  // 4. 其他编码（包括未检测到的情况）使用 iconv-lite 解码
+  return iconv.decode(buf, enc || http.default_encoding);
 }

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { decodeBody } from "../../src/core/encoding.js";
+import { decodeBody } from "../../src/utils/encoding.js";
 
 /**
  * 构造最简 Mock，模拟 AxiosResponse 中 decodeBody 用到的部分
@@ -34,7 +34,7 @@ describe("编码解码 (encoding)", () => {
     expect(result).toBe("Hello 世界");
   });
 
-  it("无 charset 声明 → 回退 GBK", () => {
+  it("无 charset 声明 → 回退默认编码 (http.yaml)", () => {
     const gbkBytes = Buffer.from([0xca, 0xfd, 0xbe, 0xdd]); // "数据"
     const resp = mockResp(gbkBytes, "text/html");
     const result = decodeBody(resp);

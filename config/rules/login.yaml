@@ -1,0 +1,31 @@
+# ============================================================
+# 通用规则 — 登录方式
+# ============================================================
+# 本文件定义论坛认证流程的规则，不包含实际账号密码。
+# 凭证请填写在 .env 文件中。
+# ============================================================
+
+# ── 登录方式 ──
+method: "ajax"                          # 登录方式：ajax（AJAX POST）
+
+# ── 登录流程 ──
+flow:
+  - step: 1
+    action: "GET"                       # 第一步：GET 首页获取 guest cookie
+    path: "index"                       # 引用 routes.yaml 中的 key
+  - step: 2
+    action: "POST"                      # 第二步：POST 提交登录表单
+    path: "login"                       # 引用 routes.yaml 中的 key
+
+# ── 表单字段（固定值，不含敏感信息） ──
+form_fields:
+  - name: "id"                          # 用户名 → 从 .env USER_ID 读取
+    type: "credential"
+  - name: "passwd"                      # 密码 → 从 .env USER_PASSWORD 读取
+    type: "credential"
+  - name: "mode"
+    value: "0"                          # 登录模式：0 = 普通登录
+    type: "fixed"
+  - name: "CookieDate"
+    value: "2"                          # Cookie 有效期：2 = 浏览器进程
+    type: "fixed"

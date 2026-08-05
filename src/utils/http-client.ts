@@ -1,6 +1,6 @@
 import axios, { type AxiosResponse } from "axios";
-import { config } from "../core/config.js";
-import { decodeBody } from "../core/encoding.js";
+import { forum, http, routes, secrets } from "./config.js";
+import { decodeBody } from "./encoding.js";
 
 // ========== Cookie 管理 ==========
 
@@ -28,29 +28,23 @@ export function clearCookie(): void {
 
 // ========== HTTP 请求 ==========
 
-const DEFAULT_HEADERS = {
-  "User-Agent":
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-  "Accept-Language": "zh-CN,zh;q=0.9",
-};
-
 /**
  * 发起论坛 AJAX 请求（带 X-Requested-With 头和 Cookie）。
  */
 export async function ajaxGet(path: string): Promise<string> {
   const url = path.includes("?")
-    ? `${config.baseUrl}${path}`
-    : `${config.baseUrl}${path}?_uid=${config.userId}`;
+    ? `${forum.base_url}${path}`
+    : `${forum.base_url}${path}?_uid=${secrets.userId}`;
 
   const resp = await axios.get(url, {
     headers: {
-      ...DEFAULT_HEADERS,
-      "X-Requested-With": "XMLHttpRequest",
-      Referer: `${config.baseUrl}/default`,
+      ...http.headers,
+      ...http.ajax_headers,
+      Referer: `${forum.base_url}${forum.default_path}`,
       Cookie: globalCookie,
     },
     responseType: "arraybuffer",
-    timeout: 15000,
+    timeout: http.timeout_ms,
     validateStatus: () => true,
   });
   saveCookie(resp);

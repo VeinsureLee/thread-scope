@@ -227,51 +227,64 @@ CREATE INDEX idx_reply_thread ON reply(thread_id, floor);
 ```
 thread-scope/
 ├── src/
-│   ├── index.ts                   # MCP Server 入口（唯一入口文件）
+│   ├── index.ts                       # MCP Server 入口（唯一入口文件）
 │   │
-│   ├── core/                      # 基础设施层
-│   │   ├── config.ts              #   配置加载（.env → 配置对象）
-│   │   ├── types.ts               #   共享类型定义（Section / Board / Article）
-│   │   ├── encoding.ts            #   GBK / UTF-8 响应体解码
-│   │   └── http-client.ts         #   Cookie 管理 + AJAX GET 请求
+│   ├── utils/                         # 通用工具（零业务逻辑）
+│   │   ├── config.ts                  #   配置加载（YAML → 配置对象）
+│   │   ├── types.ts                   #   共享类型定义
+│   │   ├── encoding.ts                #   GBK / UTF-8 响应体解码
+│   │   └── http-client.ts             #   Cookie 管理 + AJAX GET 请求
 │   │
-│   ├── auth/                      # 认证层
-│   │   └── auth.ts                #   登录流程 + requireLogin 守卫
+│   ├── auth/                          # 1. 登录 / 认证
+│   │   └── auth.ts                    #   登录流程 + requireLogin 守卫
 │   │
-│   ├── crawl/                     # 爬取层（业务逻辑）
-│   │   └── forum.ts               #   分区列表 / 版块列表 / 文章列表爬取
-│   │                              #   [未来] thread.ts — 帖子正文爬取
+│   ├── crawl/                         # 2. 爬取（按功能细分）
+│   │   ├── structure.ts               #   2.1 分区 + 版块列表
+│   │   ├── articles.ts                #   2.3 文章列表
+│   │   ├── posts.ts                   #   2.3 帖子正文 + 回复（占位）
+│   │   └── user.ts                    #   2.4 用户信息（占位）
 │   │
-│   ├── storage/                   # 存储层
-│   │   └── store.ts               #   JSON 读写（结构/统计）
-│   │                              #   [未来] db.ts — SQLite 连接
+│   ├── storage/                       # 3. 存储
+│   │   ├── store.ts                   #   JSON 读写（结构/快照）
+│   │   └── db.ts                      #   SQLite 连接（占位）
 │   │
-│   └── tools/                     # MCP 工具注册层
-│       ├── login-tool.ts          #   forum-login
-│       ├── fetch-sections.ts      #   forum-fetch-sections
-│       ├── fetch-boards.ts        #   forum-fetch-boards
-│       └── fetch-articles.ts      #   forum-fetch-articles
+│   ├── init/                          # 4. 初始化
+│   │   └── init.ts                    #   初始化编排（爬全站 → 保存）
+│   │
+│   └── tools/                         # MCP 工具注册层
+│       ├── login-tool.ts              #   forum-login
+│       ├── fetch-structure.ts         #   forum-fetch-structure
+│       ├── fetch-articles.ts          #   forum-fetch-articles
+│       └── init-tool.ts               #   forum-init
 │
-├── test/                          # 测试目录（结构与 src/ 一一对应）
+├── test/                              # 测试目录（结构与 src/ 对应）
 │   ├── core/
-│   │   ├── encoding.test.ts      #   GBK/UTF-8 解码
-│   │   └── http-client.test.ts   #   Cookie 管理
+│   │   ├── encoding.test.ts          #   编码解码
+│   │   └── http-client.test.ts       #   Cookie 管理
 │   ├── auth/
-│   │   └── auth.test.ts          #   认证守卫
+│   │   └── auth.test.ts              #   认证守卫
 │   ├── crawl/
-│   │   └── html-parser.test.ts   #   cheerio HTML 解析（本地 fixture）
+│   │   └── html-parser.test.ts       #   cheerio HTML 解析（本地 fixture）
 │   └── storage/
-│       └── storage.test.ts       #   JSON 读写
+│       └── storage.test.ts           #   JSON 读写
 │
-├── data/                          # 持久化数据
-│   ├── forum-structure.json       #   [计划中] 论坛结构缓存
-│   └── forum.db                   #   [计划中] SQLite 数据库
+├── config/                            # 配置文件（全部提交）
+│   ├── external/
+│   │   └── forum.yaml                 #   1. 外部视角：论坛地址
+│   └── rules/
+│       ├── routes.yaml                #   2. 通用规则：路由模板
+│       ├── selectors.yaml             #   2. 通用规则：CSS 选择器
+│       ├── login.yaml                 #   2. 通用规则：登录方式
+│       └── http.yaml                  #   2. 通用规则：请求头/超时/编码
 │
-├── config/
-│   └── config.yaml                # 备用配置（当前未使用）
+├── data/                              # 3. 内部结构（gitignored）
+│   ├── forum-structure.json           #   结构缓存（forum-init 产出）
+│   ├── board-*.json                   #   版块文章快照
+│   └── forum.db                       #   [计划中] SQLite 数据库
+│
 ├── package.json
 ├── tsconfig.json
-├── .env.example
+├── .env.example                       # 仅凭证（提交）
 └── README.md
 ```
 
@@ -367,13 +380,11 @@ npm run inspect
 
 | 工具名 | 参数 | 说明 |
 |---|---|---|
-| `hello` | `name: string` | 测试工具，返回问候语 |
 | `forum-login` | （无） | 登录论坛，获取认证 Cookie |
-| `forum-fetch-sections` | （无） | 获取所有分区列表 |
-| `forum-fetch-boards` | `sectionId: string` | 获取指定分区下的版块 |
+| `forum-fetch-structure` | `sectionId?: string` | 获取论坛结构（分区+版块），不传 ID 时获取全部 |
 | `forum-fetch-articles` | `boardName: string` | 获取指定版块的文章列表 |
+| `forum-init` | （无） | 一键初始化：爬取全站结构 + 各版块首页文章 |
 | `forum-fetch-thread` | `threadUrl: string` | [计划中] 获取帖子正文及回复 |
-| `forum-init` | （无） | [计划中] 初始化全站结构数据 |
 | `forum-check-updates` | `boardName?: string` | [计划中] 检查更新 |
 
 ---

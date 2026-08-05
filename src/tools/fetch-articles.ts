@@ -1,7 +1,7 @@
 import type { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
 import { requireLogin } from "../auth/auth.js";
-import { fetchBoardArticles } from "../crawl/forum.js";
+import { fetchBoardArticles } from "../crawl/articles.js";
 
 /** 注册获取版块文章列表工具 */
 export function registerFetchArticlesTool(server: McpServer): void {
@@ -11,10 +11,7 @@ export function registerFetchArticlesTool(server: McpServer): void {
       title: "获取文章列表",
       description: "爬取指定版块首页的文章列表。需要先执行 forum-login。",
       inputSchema: z.object({
-        boardName: z
-          .string()
-          .min(1)
-          .describe("版块英文名"),
+        boardName: z.string().min(1).describe("版块英文名"),
       }),
     },
     async ({ boardName }) => {

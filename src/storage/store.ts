@@ -4,7 +4,7 @@ import * as path from "path";
 // ========== JSON 存储（轻量数据：论坛结构、版块统计） ==========
 
 /** 获取 data 目录路径 */
-function getDataDir(): string {
+export function getDataDir(): string {
   const dir = path.resolve(process.cwd(), "data");
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true });

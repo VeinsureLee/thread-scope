@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { saveCookie, getCookie, clearCookie } from "../../src/core/http-client.js";
+import { saveCookie, getCookie, clearCookie } from "../../src/utils/http-client.js";
 
 // 通过重新 set globalCookie 来清理，但它是模块级私有变量。
 // 我们必须通过 clearCookie 和 saveCookie 间接操作，然后再重新导入来重置。
