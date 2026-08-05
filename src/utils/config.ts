@@ -54,6 +54,7 @@ export interface RoutesConfig {
   user_query: string;
   tree_root_param: string;
   tree_recursive_param: string;
+  count_param: string;
 }
 
 export const routes = loadYaml<RoutesConfig>("rules/routes.yaml");
@@ -76,6 +77,7 @@ export interface SelectorsConfig {
   };
   board_stats: {
     online_users: string;
+    today_posts: string;
   };
   article_list: {
     row_selector: string;

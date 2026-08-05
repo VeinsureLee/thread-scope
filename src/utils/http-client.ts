@@ -32,9 +32,8 @@ export function clearCookie(): void {
  * 发起论坛 AJAX 请求（带 X-Requested-With 头和 Cookie）。
  */
 export async function ajaxGet(path: string): Promise<string> {
-  const url = path.includes("?")
-    ? `${forum.base_url}${path}`
-    : `${forum.base_url}${path}?_uid=${secrets.userId}`;
+  const separator = path.includes("?") ? "&" : "?";
+  const url = `${forum.base_url}${path}${separator}_uid=${secrets.userId}`;
 
   const resp = await axios.get(url, {
     headers: {

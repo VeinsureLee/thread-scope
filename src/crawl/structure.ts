@@ -64,9 +64,14 @@ function extractName(t: string): string {
   return m ? m[1]! : t;
 }
 
-// ============================================================
-// 版块详情（批量获取统计信息）
-// ============================================================
+/**
+ * 将 AJAX 返回的 id（如 "sec-0"）转为 HTML 页需要的 sectionId（如 "0"）。
+ * 同时把 /section/ 从 href 提取的值（如 "0"）直接转数字格式。
+ */
+function toSectionHtmlId(ajaxId: string): string {
+  // "sec-0" → "0", "sec-BBSLOG" → "BBSLOG"
+  return ajaxId.replace(/^sec-/, "");
+}
 
 /**
  * 批量获取同一分区下版块的完整信息。
@@ -79,7 +84,7 @@ async function batchFetchBoardDetails(
   entries: AjaxEntry[],
 ): Promise<Board[]> {
   const html = await ajaxGet(
-    fillRoute(routes.section_detail, { sectionId: parentId }),
+    fillRoute(routes.section_detail, { sectionId: toSectionHtmlId(parentId) }),
   );
 
   const { load } = await import("cheerio");
@@ -96,12 +101,13 @@ async function batchFetchBoardDetails(
     const name = extractName(entry.t);
     if (!name) continue;
 
-    const ename = $tr
-      .find(sel.ename)
-      .text()
-      .trim()
-      .replace(name, "")
-      .trim();
+    // 英文名：优先从 <a> 的 href 中提取 /board/{ename}
+    const $a = $tr.find(sel.ename).find("a").first();
+    const href = $a.attr("href") || "";
+    const boardMatch = href.match(/\/board\/(.+)/);
+    const ename = boardMatch
+      ? boardMatch[1]!.trim()
+      : $tr.find(sel.ename).text().trim().replace(name, "").trim();
     const manager = $tr
       .find(sel.manager)
       .text()

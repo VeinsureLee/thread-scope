@@ -15,6 +15,7 @@ login: "/user/ajax_login.json"                  # AJAX 登录接口（POST）
 #   root=list-section → 根级（一级讨论区）
 #   root={parentId}   → 该区下的子节点（可能是子讨论区或版块）
 sections_ajax: "/section/ajax_list.json"         # AJAX 分区/子区/版块列表（JSON）
+# section_detail 需要数字 ID：sec-0 → /section/0
 section_detail: "/section/{sectionId}"           # 分区/版块详情页（HTML）
 
 # ── 版块文章 ──

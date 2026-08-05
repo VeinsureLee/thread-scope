@@ -5,6 +5,7 @@ import { StdioServerTransport } from "@modelcontextprotocol/server/stdio";
 import { registerLoginTool } from "./tools/login-tool.js";
 import { registerFetchStructureTool } from "./tools/fetch-structure.js";
 import { registerFetchArticlesTool } from "./tools/fetch-articles.js";
+import { registerFetchTrafficTool } from "./tools/fetch-traffic.js";
 import { registerInitTool } from "./tools/init-tool.js";
 
 // ── 创建 MCP Server ──
@@ -17,6 +18,7 @@ const server = new McpServer({
 registerLoginTool(server);
 registerFetchStructureTool(server);
 registerFetchArticlesTool(server);
+registerFetchTrafficTool(server);
 registerInitTool(server);
 
 // ── 启动 ──

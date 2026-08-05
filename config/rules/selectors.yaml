@@ -27,7 +27,8 @@ board_list:
 
 # ── 版块统计（/section/{id}?count=1 HTML 中额外出现的列） ──
 board_stats:
-  online_users: ".title_8"                     # 当前在线人数
+  online_users: ".title_4"                     # 当前在线人数
+  today_posts: ".title_5"                      # 今日发帖数
 
 # ── 文章列表页（/board/{name}） ──
 article_list:
