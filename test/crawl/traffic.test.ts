@@ -7,6 +7,8 @@ import { load } from "cheerio";
  * 测试指标：
  * - collectLeafBoards 递归收集版块叶子节点
  * - parseSectionTraffic 从 HTML 提取流量字段
+ *
+ * 注意：所有名称与数据均为合成测试数据，不包含真实论坛内容。
  */
 
 // ============================================================
@@ -19,7 +21,7 @@ interface TestBoardNode {
   name: string;
   type: "board";
   level: number;
-  board: { name: string; ename: string; manager: string; posts: string; threads: string };
+  board: { name: string; ename: string; manager: string[] };
 }
 
 interface TestSectionNode {
@@ -105,63 +107,63 @@ function collectLeafBoards(
   return { leaves: [], nodeName: "" };
 }
 
-/** 构建测试用树 */
+/** 构建测试用树（全部为合成名称） */
 function makeTestTree(): TestTreeNode[] {
   return [
     {
-      id: "sec-0",
-      name: "本站站务",
+      id: "sec-alpha",
+      name: "分区甲",
       type: "section",
       level: 1,
       children: [
         {
-          id: "board-Advice",
-          name: "意见与建议",
+          id: "board-b1",
+          name: "版块一",
           type: "board",
           level: 2,
-          board: { name: "意见与建议", ename: "Advice", manager: "admin", posts: "5000", threads: "300" },
+          board: { name: "版块一", ename: "b1", manager: ["moderator1"] },
         },
         {
-          id: "board-BBShelp",
-          name: "论坛帮助",
+          id: "board-b2",
+          name: "版块二",
           type: "board",
           level: 2,
-          board: { name: "论坛帮助", ename: "BBShelp", manager: "admin", posts: "2000", threads: "150" },
+          board: { name: "版块二", ename: "b2", manager: ["moderator1"] },
         },
       ],
     },
     {
-      id: "news",
-      name: "校园生活",
+      id: "zone-beta",
+      name: "分区乙",
       type: "section",
       level: 1,
       children: [
         {
-          id: "board-JobInfo",
-          name: "招聘信息",
+          id: "board-b3",
+          name: "版块三",
           type: "board",
           level: 2,
-          board: { name: "招聘信息", ename: "JobInfo", manager: "recruiter", posts: "50000", threads: "3000" },
+          board: { name: "版块三", ename: "b3", manager: ["recruiter1"] },
         },
         {
-          id: "BBSLOG",
-          name: "院系风采",
+          id: "sub-gamma",
+          name: "子分区丙",
           type: "section",
           level: 2,
           children: [
             {
-              id: "board-CS",
-              name: "计算机学院",
+              id: "board-b4",
+              name: "版块甲",
               type: "board",
               level: 3,
-              board: { name: "计算机学院", ename: "CS", manager: "", posts: "10000", threads: "500" },
+              board: { name: "版块甲", ename: "b4", manager: [] },
             },
             {
-              id: "board-SE",
-              name: "软件学院",
+              id: "board-b5",
+              name: "版块乙",
               type: "board",
               level: 3,
-              board: { name: "软件学院", ename: "SE", manager: "", posts: "8000", threads: "400" },
+              board: { name: "版块乙", ename: "b5", manager: [] },
             },
           ],
         },
@@ -174,43 +176,43 @@ describe("collectLeafBoards（叶节点收集）", () => {
   const tree = makeTestTree();
 
   it("传入 board 节点返回自身", () => {
-    const { leaves, nodeName } = collectLeafBoards(tree, "board-Advice");
+    const { leaves, nodeName } = collectLeafBoards(tree, "board-b1");
 
     expect(leaves).toHaveLength(1);
-    expect(leaves[0]!.node.id).toBe("board-Advice");
-    expect(leaves[0]!.parentSectionId).toBe("sec-0");
-    expect(nodeName).toBe("意见与建议");
+    expect(leaves[0]!.node.id).toBe("board-b1");
+    expect(leaves[0]!.parentSectionId).toBe("sec-alpha");
+    expect(nodeName).toBe("版块一");
   });
 
   it("传入 section 节点收集所有子孙 boards", () => {
-    const { leaves, nodeName } = collectLeafBoards(tree, "sec-0");
+    const { leaves, nodeName } = collectLeafBoards(tree, "sec-alpha");
 
-    expect(nodeName).toBe("本站站务");
+    expect(nodeName).toBe("分区甲");
     expect(leaves).toHaveLength(2);
-    expect(leaves.map((l) => l.node.id).sort()).toEqual(["board-Advice", "board-BBShelp"]);
+    expect(leaves.map((l) => l.node.id).sort()).toEqual(["board-b1", "board-b2"]);
     // 所有叶子应归属到该分区
     leaves.forEach((l) => {
-      expect(l.parentSectionId).toBe("sec-0");
+      expect(l.parentSectionId).toBe("sec-alpha");
     });
   });
 
   it("传入深层 section 收集子孙 boards（二级目录）", () => {
-    const { leaves, nodeName } = collectLeafBoards(tree, "BBSLOG");
+    const { leaves, nodeName } = collectLeafBoards(tree, "sub-gamma");
 
-    expect(nodeName).toBe("院系风采");
+    expect(nodeName).toBe("子分区丙");
     expect(leaves).toHaveLength(2);
-    expect(leaves.map((l) => l.node.name).sort()).toEqual(["计算机学院", "软件学院"]);
+    expect(leaves.map((l) => l.node.name).sort()).toEqual(["版块乙", "版块甲"]);
   });
 
   it("传入顶级 section 收集全部 boards", () => {
-    const { leaves } = collectLeafBoards(tree, "news");
+    const { leaves } = collectLeafBoards(tree, "zone-beta");
 
-    expect(leaves).toHaveLength(3); // JobInfo + CS + SE
-    // 直接子板 parent 为 news，嵌套子板 parent 为 BBSLOG
-    const jobInfo = leaves.find((l) => l.node.id === "board-JobInfo")!;
-    expect(jobInfo.parentSectionId).toBe("news");
-    const cs = leaves.find((l) => l.node.id === "board-CS")!;
-    expect(cs.parentSectionId).toBe("BBSLOG");
+    expect(leaves).toHaveLength(3); // b3 + b4 + b5
+    // 直接子板 parent 为 zone-beta，嵌套子板 parent 为 sub-gamma
+    const b3 = leaves.find((l) => l.node.id === "board-b3")!;
+    expect(b3.parentSectionId).toBe("zone-beta");
+    const b4 = leaves.find((l) => l.node.id === "board-b4")!;
+    expect(b4.parentSectionId).toBe("sub-gamma");
   });
 
   it("空树返回空结果", () => {
@@ -229,42 +231,42 @@ describe("collectLeafBoards（叶节点收集）", () => {
   });
 
   it("深层嵌套 board（level 3+）正确追溯 parentSectionId", () => {
-    const { leaves } = collectLeafBoards(tree, "board-SE");
+    const { leaves } = collectLeafBoards(tree, "board-b5");
     expect(leaves).toHaveLength(1);
-    expect(leaves[0]!.parentSectionId).toBe("BBSLOG");
+    expect(leaves[0]!.parentSectionId).toBe("sub-gamma");
   });
 
   it("传入 section 中文名匹配分区（Tier 4）", () => {
-    const { leaves, nodeName } = collectLeafBoards(tree, "校园生活");
-    expect(nodeName).toBe("校园生活");
-    expect(leaves).toHaveLength(3); // JobInfo + CS + SE
+    const { leaves, nodeName } = collectLeafBoards(tree, "分区乙");
+    expect(nodeName).toBe("分区乙");
+    expect(leaves).toHaveLength(3); // b3 + b4 + b5
   });
 
   it("传入 section 中文名匹配嵌套分区", () => {
-    const { leaves, nodeName } = collectLeafBoards(tree, "院系风采");
-    expect(nodeName).toBe("院系风采");
+    const { leaves, nodeName } = collectLeafBoards(tree, "子分区丙");
+    expect(nodeName).toBe("子分区丙");
     expect(leaves).toHaveLength(2);
-    expect(leaves.map((l) => l.node.name).sort()).toEqual(["计算机学院", "软件学院"]);
+    expect(leaves.map((l) => l.node.name).sort()).toEqual(["版块乙", "版块甲"]);
   });
 
   it("传入 sec- 前缀匹配分区 ID", () => {
-    const { leaves, nodeName } = collectLeafBoards(tree, "sec-0");
-    expect(nodeName).toBe("本站站务");
+    const { leaves, nodeName } = collectLeafBoards(tree, "sec-alpha");
+    expect(nodeName).toBe("分区甲");
     expect(leaves).toHaveLength(2);
   });
 
-  it("传入 sec- 前缀匹配分区 ID（news → sec-news）", () => {
-    const { leaves, nodeName } = collectLeafBoards(tree, "sec-news");
-    expect(nodeName).toBe("校园生活");
+  it("传入 sec- 前缀匹配分区 ID（zone-beta → sec-zone-beta）", () => {
+    const { leaves, nodeName } = collectLeafBoards(tree, "sec-zone-beta");
+    expect(nodeName).toBe("分区乙");
     expect(leaves).toHaveLength(3);
   });
 
-  it("传入带括号的输入（如 board-(IWhisper) 式样）", () => {
-    // 即使树中没有该节点，应能匹配到 board-Advice
-    const { leaves, nodeName } = collectLeafBoards(tree, "board-(Advice)");
-    expect(nodeName).toBe("意见与建议");
+  it("传入带括号的输入（如 board-(b1) 式样）", () => {
+    // 即使树中没有该节点，应能匹配到 board-b1
+    const { leaves, nodeName } = collectLeafBoards(tree, "board-(b1)");
+    expect(nodeName).toBe("版块一");
     expect(leaves).toHaveLength(1);
-    expect(leaves[0]!.node.id).toBe("board-Advice");
+    expect(leaves[0]!.node.id).toBe("board-b1");
   });
 });
 
@@ -277,38 +279,38 @@ const ONLINE_USERS_SELECTOR = ".title_8";
 const THREADS_SELECTOR = ".title_6";
 const POSTS_SELECTOR = ".title_7";
 
-/** 构建带 count=1 额外列的版块列表 HTML */
+/** 构建带 count=1 额外列的版块列表 HTML（合成数据） */
 function makeTrafficHtml(): string {
   return `
 <table class="board-list">
   <tbody>
     <tr>
-      <td class="title_1"><a href="/board/JobInfo">招聘信息</a> (JobInfo)</td>
-      <td class="title_2">板主: admin</td>
+      <td class="title_1"><a href="/board/b3">版块三</a> (b3)</td>
+      <td class="title_2">板主: mod1</td>
       <td class="title_4">35</td>
       <td class="title_6">12345</td>
       <td class="title_7">67890</td>
       <td class="title_8">142</td>
     </tr>
     <tr>
-      <td class="title_1"><a href="/board/SecondHand">二手市场</a> (SecondHand)</td>
-      <td class="title_2">板主: user1</td>
+      <td class="title_1"><a href="/board/market">二手版</a> (market)</td>
+      <td class="title_2">板主: mod2</td>
       <td class="title_4">20</td>
       <td class="title_6">5000</td>
       <td class="title_7">30000</td>
       <td class="title_8">89</td>
     </tr>
     <tr>
-      <td class="title_1"><a href="/board/Advice">意见与建议</a> (Advice)</td>
-      <td class="title_2">板主: root</td>
+      <td class="title_1"><a href="/board/b1">版块一</a> (b1)</td>
+      <td class="title_2">板主: mod3</td>
       <td class="title_4">3</td>
       <td class="title_6">800</td>
       <td class="title_7">5000</td>
       <td class="title_8">12</td>
     </tr>
     <tr>
-      <td class="title_1"><a href="/board/Whisper">悄悄话</a></td>
-      <td class="title_2">板主: admin</td>
+      <td class="title_1"><a href="/board/whisper">私语版</a></td>
+      <td class="title_2">板主: mod4</td>
       <td class="title_4">42</td>
       <td class="title_6">999</td>
       <td class="title_7">8888</td>
@@ -394,15 +396,15 @@ describe("parseSectionTraffic（流量 HTML 解析）", () => {
     const all = parseAllTraffic(html);
     expect(all).toHaveLength(4);
 
-    expect(all[0]!.name).toBe("招聘信息");
-    expect(all[0]!.ename).toBe("JobInfo");
+    expect(all[0]!.name).toBe("版块三");
+    expect(all[0]!.ename).toBe("b3");
     expect(all[0]!.todayPosts).toBe("35");
     expect(all[0]!.threads).toBe("12345");
     expect(all[0]!.posts).toBe("67890");
     expect(all[0]!.onlineUsers).toBe("142");
 
-    // 悄悄话：纯中文名无 ename
-    expect(all[3]!.name).toBe("悄悄话");
+    // 私语版：纯中文名无 ename
+    expect(all[3]!.name).toBe("私语版");
     expect(all[3]!.ename).toBe("");
     expect(all[3]!.todayPosts).toBe("42");
   });
@@ -410,20 +412,20 @@ describe("parseSectionTraffic（流量 HTML 解析）", () => {
   it("按 ename 集合过滤只返回需要的版块", () => {
     const filtered = parseSectionTraffic(
       html,
-      new Set(["JobInfo", "Advice"]),
+      new Set(["b3", "b1"]),
     );
     expect(filtered).toHaveLength(2);
-    expect(filtered.map((t) => t.ename).sort()).toEqual(["Advice", "JobInfo"]);
+    expect(filtered.map((t) => t.ename).sort()).toEqual(["b1", "b3"]);
   });
 
-  it("按中文名回退匹配纯中文版块（如悄悄话）", () => {
+  it("按中文名回退匹配纯中文版块（如私语版）", () => {
     const filtered = parseSectionTraffic(
       html,
-      new Set(["(悄悄话)"]),   // 树中 ename 为 "(悄悄话)"，清理后为 "悄悄话"
-      new Set(["悄悄话"]),      // 中文名集合
+      new Set(["(私语版)"]),   // 树中 ename 为 "(私语版)"，清理后为 "私语版"
+      new Set(["私语版"]),      // 中文名集合
     );
     expect(filtered).toHaveLength(1);
-    expect(filtered[0]!.name).toBe("悄悄话");
+    expect(filtered[0]!.name).toBe("私语版");
     expect(filtered[0]!.todayPosts).toBe("42");
     expect(filtered[0]!.threads).toBe("999");
     expect(filtered[0]!.posts).toBe("8888");
@@ -445,7 +447,7 @@ describe("parseSectionTraffic（流量 HTML 解析）", () => {
 <table class="board-list">
   <tbody>
     <tr>
-      <td class="title_1"><a href="/board/Test">测试版</a> (Test)</td>
+      <td class="title_1"><a href="/board/test1">测试版</a> (test1)</td>
       <td class="title_2">板主: x</td>
       <td class="title_6">100</td>
     </tr>
@@ -464,7 +466,7 @@ describe("parseSectionTraffic（流量 HTML 解析）", () => {
 <table class="board-list">
   <tbody>
     <tr>
-      <td class="title_1"><a href="/board/Advice">意见与建议</a> (Advice)</td>
+      <td class="title_1"><a href="/board/b1">版块一</a> (b1)</td>
       <td class="title_6">800</td>
       <td class="title_7">5000</td>
     </tr>
@@ -477,7 +479,7 @@ describe("parseSectionTraffic（流量 HTML 解析）", () => {
 </table>`;
     const all = parseAllTraffic(htmlWithEmptyRow);
     expect(all).toHaveLength(1);
-    expect(all[0]!.ename).toBe("Advice");
+    expect(all[0]!.ename).toBe("b1");
   });
 });
 
@@ -487,22 +489,22 @@ describe("parseSectionTraffic（流量 HTML 解析）", () => {
 
 describe("extractEnameFromCell（英文名提取）", () => {
   it("标准 (ename) 格式", () => {
-    expect(extractEnameFromCell("招聘信息 (JobInfo)", "招聘信息")).toBe("JobInfo");
+    expect(extractEnameFromCell("版块三 (b3)", "版块三")).toBe("b3");
   });
 
   it("无括号回退：去掉中文名后取剩余", () => {
-    expect(extractEnameFromCell("耳语IWhisper", "耳语")).toBe("IWhisper");
+    expect(extractEnameFromCell("耳语版Whisper", "耳语版")).toBe("Whisper");
   });
 
   it("中文括号 fallback", () => {
-    expect(extractEnameFromCell("意见与建议（Advice）", "意见与建议")).toBe("Advice");
+    expect(extractEnameFromCell("版块一（b1）", "版块一")).toBe("b1");
   });
 
   it("中文名即全文、无 ename 时返回空", () => {
-    expect(extractEnameFromCell("耳语", "耳语")).toBe("");
+    expect(extractEnameFromCell("耳语版", "耳语版")).toBe("");
   });
 
   it("无中文名参数时回退到正则匹配", () => {
-    expect(extractEnameFromCell("论坛帮助 (BBShelp)", "")).toBe("BBShelp");
+    expect(extractEnameFromCell("版块二 (b2)", "")).toBe("b2");
   });
 });

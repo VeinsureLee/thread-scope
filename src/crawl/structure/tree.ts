@@ -56,9 +56,7 @@ export async function crawlNodeTree(
       boards = boardEntries.map((entry) => ({
         name: extractName(entry.t),
         ename: extractBoardEname(extractHref(entry.t)) || `(${extractName(entry.t)})`,
-        manager: "",
-        posts: "",
-        threads: "",
+        manager: [],
       }));
     }
 

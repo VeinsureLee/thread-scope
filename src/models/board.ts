@@ -1,14 +1,15 @@
-/** 版块（board），树中的叶子节点 */
+/**
+ * 版块（board），树中的叶子节点。
+ *
+ * 只保存基本不变的静态字段。
+ * 经常变化的流量数据（帖子数、主题数、在线人数、今日发帖）由 traffic 模块
+ * 实时获取，归 TrafficInfo，不存储在这里。
+ */
 export interface Board {
   name: string;
   ename: string;
-  manager: string;
-  posts: string;
-  threads: string;
-  /** 当前在线人数（仅带 count 参数时可用） */
-  onlineUsers?: string;
-  /** 今日发帖数（仅带 count 参数时可用） */
-  todayPosts?: string;
+  /** 版主用户名列表（一个版块可能有多个版主） */
+  manager: string[];
 }
 
 /** 版块叶子节点 */

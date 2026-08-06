@@ -72,6 +72,7 @@ export interface SelectorsConfig {
     name: string;
     ename: string;
     manager: string;
+    manager_link: string;
     threads: string;
     posts: string;
   };

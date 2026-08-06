@@ -21,7 +21,8 @@ board_list:
   row_selector: "table.board-list tbody tr"
   name: ".title_1 a"                           # 版块中文名（a 标签文本）
   ename: ".title_1"                            # 版块英文名（从 title_1 全文中提取）
-  manager: ".title_2"                          # 版主信息
+  manager: ".title_2"                          # 版主单元格（含一个或多个版主链接）
+  manager_link: 'a[href*="/user/query/"]'       # 版主用户名链接（多版主时按链接逐个提取）
   threads: ".title_6"                          # 主题数
   posts: ".title_7"                            # 帖子数
 

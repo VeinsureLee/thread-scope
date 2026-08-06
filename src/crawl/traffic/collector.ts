@@ -76,3 +76,25 @@ export function collectLeafBoards(
 
   return { leaves: [], nodeName: "" };
 }
+
+/**
+ * 收集树中所有 BoardNode 叶子。
+ *
+ * @param tree            完整树
+ * @param parentSectionId 当前层级的父分区 ID（递归时传入，根级为 ""）
+ * @returns 全部叶子（含各自父分区引用）
+ */
+export function collectAllLeafBoards(
+  tree: ForumTreeNode[],
+  parentSectionId: string = "",
+): LeafBoardRef[] {
+  const leaves: LeafBoardRef[] = [];
+  for (const node of tree) {
+    if (node.type === "board") {
+      leaves.push({ node, parentSectionId });
+    } else {
+      leaves.push(...collectAllLeafBoards(node.children, node.id));
+    }
+  }
+  return leaves;
+}

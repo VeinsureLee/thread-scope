@@ -1,7 +1,44 @@
 import type { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
 import { requireLogin } from "../auth/auth.js";
-import { fetchTraffic } from "../crawl/traffic/index.js";
+import { fetchTraffic, fetchAllTraffic } from "../crawl/traffic/index.js";
+import type { TrafficTreeNode } from "../models/index.js";
+
+/** 格式化单条流量统计 */
+function formatTraffic(t: {
+  onlineUsers?: string;
+  todayPosts?: string;
+  threads?: string;
+  posts?: string;
+} | null): string {
+  if (!t) return "未统计";
+  return `在线:${t.onlineUsers || "-"} | 今日:${t.todayPosts || "-"} | 主题:${t.threads || "-"} | 文章:${t.posts || "-"}`;
+}
+
+/** 树状缩进输出 */
+function formatTree(
+  nodes: TrafficTreeNode[],
+  prefix = "",
+  isRoot = true,
+): string[] {
+  const lines: string[] = [];
+  for (let i = 0; i < nodes.length; i++) {
+    const node = nodes[i]!;
+    const last = i === nodes.length - 1;
+    const branch = isRoot ? "" : (last ? "└── " : "├── ");
+    const childPrefix = isRoot ? "" : (last ? "    " : "│   ");
+
+    const label = node.type === "section" ? "分区" : "版块";
+    lines.push(
+      `${prefix}${branch}${label} ${node.name} (${node.id}) [${formatTraffic(node.traffic)}]`,
+    );
+
+    if (node.children?.length) {
+      lines.push(...formatTree(node.children, prefix + childPrefix, false));
+    }
+  }
+  return lines;
+}
 
 /** 注册获取流量信息工具 */
 export function registerFetchTrafficTool(server: McpServer): void {
@@ -10,46 +47,47 @@ export function registerFetchTrafficTool(server: McpServer): void {
     {
       title: "获取版面/分区流量",
       description:
-        "获取指定节点（版面或分区）的流量信息，包括在线人数、今日发帖、主题数、文章总数。传入版面 ID 时只返回该版面；传入分区 ID 时递归汇总该分区下所有版面的流量。需要先执行 forum-login。",
+        "获取版面的流量信息（在线人数、今日发帖、主题数、文章总数），以树状结构返回。不传参数时爬取全站所有版面的流量并写入数据库；传入版面/分区 ID 时只爬取该节点下的版面。section 节点返回其下全部版面的聚合统计（有版面未统计则为 null）。流量采样会异步写入数据库供历史查询。需要先执行 forum-login。",
       inputSchema: z.object({
         nodeId: z
           .string()
-          .min(1)
-          .describe("节点 ID，如 sec-0（分区）或 board-JobInfo（版面）"),
+          .optional()
+          .describe(
+            "可选，节点 ID，如 sec-0（分区）或 board-JobInfo（版面）。不传则爬取全站",
+          ),
       }),
     },
     async ({ nodeId }) => {
       requireLogin();
-      const snapshot = await fetchTraffic(nodeId);
 
-      // 构建可读文本输出
+      const result = nodeId
+        ? await fetchTraffic(nodeId)
+        : await fetchAllTraffic();
+
+      // 文本输出：树状视图
       const lines: string[] = [
-        `节点: ${snapshot.nodeName} (${snapshot.nodeId})`,
-        `爬取时间: ${snapshot.crawledAt}`,
-        `记录数: ${snapshot.records.length}`,
+        `节点: ${result.nodeName}${nodeId ? ` (${nodeId})` : " (全部)"}`,
+        `爬取时间: ${result.crawledAt}`,
+        `记录数: ${result.records.length}`,
         "",
       ];
 
-      if (snapshot.errors.length > 0) {
-        lines.push(`⚠ 部分失败 (${snapshot.errors.length}):`);
-        for (const err of snapshot.errors) {
+      if (result.errors.length > 0) {
+        lines.push(`⚠ 部分失败 (${result.errors.length}):`);
+        for (const err of result.errors) {
           lines.push(`  - ${err}`);
         }
         lines.push("");
       }
 
-      for (const r of snapshot.records) {
-        lines.push(
-          `[${r.name}] (${r.ename}) 在线:${r.onlineUsers || "-"} | 今日:${r.todayPosts || "-"} | 主题:${r.threads || "-"} | 文章:${r.posts || "-"}`,
-        );
-      }
+      lines.push(...formatTree(result.tree));
 
       return {
         content: [
           { type: "text", text: lines.join("\n") },
           {
             type: "text",
-            text: JSON.stringify(snapshot, null, 2),
+            text: JSON.stringify(result, null, 2),
           },
         ],
       };

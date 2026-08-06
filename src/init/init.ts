@@ -14,7 +14,7 @@ export interface InitResult {
  *
  * 流程：
  * 1. 检查登录状态
- * 2. 递归爬取完整树状结构 → 保存 forum-structure.json
+ * 2. 递归爬取完整树状结构 → 保存 structure-overview.json
  *
  * 树状层级说明：
  *   第 1 层（level 1）：根级讨论区（如"校园生活"、"学术天地"）
@@ -49,7 +49,7 @@ export async function initForum(): Promise<InitResult> {
     crawledAt: new Date().toISOString(),
     tree,
   };
-  writeJson("forum-structure.json", forumStructure);
+  writeJson("structure-overview.json", forumStructure);
 
   // ── 2. 遍历树统计各层级 ──
   function walkTree(nodes: ForumTreeNode[], depth: number = 0) {

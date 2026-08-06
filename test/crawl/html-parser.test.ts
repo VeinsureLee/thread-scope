@@ -6,6 +6,8 @@ import { load } from "cheerio";
  *
  * 这些测试不访问网络，仅验证 cheerio 选择器的正确性。
  * 论坛 HTML 结构变更时修改这些 fixture 和测试即可。
+ *
+ * 注意：所有名称与数据均为合成测试数据，不包含真实论坛内容。
  */
 
 // 模拟版块列表页面 HTML（分区页面结构）
@@ -15,14 +17,14 @@ const SECTION_HTML = `
 <table class="board-list">
   <tbody>
     <tr>
-      <td class="title_1"><a href="/board/example">招聘信息</a> (example)</td>
-      <td class="title_2">板主: admin</td>
+      <td class="title_1"><a href="/board/example">招聘版</a> (example)</td>
+      <td class="title_2">板主: mod1</td>
       <td class="title_6">12345</td>
       <td class="title_7">67890</td>
     </tr>
     <tr>
-      <td class="title_1"><a href="/board/example2">兼职实习</a> (example2)</td>
-      <td class="title_2">板主: admin</td>
+      <td class="title_1"><a href="/board/example2">兼职版</a> (example2)</td>
+      <td class="title_2">板主: mod2</td>
       <td class="title_6">5432</td>
       <td class="title_7">21098</td>
     </tr>
@@ -46,17 +48,17 @@ const ARTICLE_LIST_HTML = `
 <table class="board-list">
   <tbody>
     <tr>
-      <td class="title_9"><a href="/article/example/123">【校招】字节跳动内推</a></td>
+      <td class="title_9"><a href="/article/example/123">【公告】版规更新公告</a></td>
       <td><a href="/user/query/alice">alice</a></td>
       <td>2025-01-15 14:30:00</td>
     </tr>
     <tr>
-      <td class="title_9"><a href="/article/example/456">【内推】华为秋招</a></td>
+      <td class="title_9"><a href="/article/example/456">【讨论】话题征集帖</a></td>
       <td><a href="/user/query/bob">bob</a></td>
       <td>2025-01-16 10:20:00</td>
     </tr>
     <tr class="top">
-      <td class="title_3"><a href="/article/example/789">【公告】发帖规范</a></td>
+      <td class="title_3"><a href="/article/example/789">【置顶】版规说明</a></td>
       <td><a href="/user/query/admin">admin</a></td>
       <td>2024-06-01 08:00:00</td>
     </tr>
@@ -92,8 +94,8 @@ describe("HTML 解析 (cheerio)", () => {
       });
 
       expect(boards).toHaveLength(2);
-      expect(boards[0]).toEqual({ name: "招聘信息", ename: "(example)" });
-      expect(boards[1]).toEqual({ name: "兼职实习", ename: "(example2)" });
+      expect(boards[0]).toEqual({ name: "招聘版", ename: "(example)" });
+      expect(boards[1]).toEqual({ name: "兼职版", ename: "(example2)" });
     });
 
     it("解析版主和统计信息", () => {
@@ -103,7 +105,7 @@ describe("HTML 解析 (cheerio)", () => {
       const threads = firstRow.find(".title_6").text().trim();
       const posts = firstRow.find(".title_7").text().trim();
 
-      expect(manager).toContain("admin");
+      expect(manager).toContain("mod1");
       expect(threads).toBe("12345");
       expect(posts).toBe("67890");
     });
@@ -128,7 +130,7 @@ describe("HTML 解析 (cheerio)", () => {
         .find(".title_9 a")
         .first();
 
-      expect(firstTitle.text().trim()).toBe("【校招】字节跳动内推");
+      expect(firstTitle.text().trim()).toBe("【公告】版规更新公告");
       expect(firstTitle.attr("href")).toBe("/article/example/123");
     });
 
@@ -139,7 +141,7 @@ describe("HTML 解析 (cheerio)", () => {
       const thirdRow = $(trs[2]!);
       const titleEl = thirdRow.find(".title_3 a").first();
 
-      expect(titleEl.text().trim()).toBe("【公告】发帖规范");
+      expect(titleEl.text().trim()).toBe("【置顶】版规说明");
       expect(titleEl.attr("href")).toBe("/article/example/789");
     });
 
@@ -185,10 +187,10 @@ describe("HTML 解析 (cheerio)", () => {
       });
 
       expect(articles).toHaveLength(3);
-      expect(articles[0]!.title).toBe("【校招】字节跳动内推");
+      expect(articles[0]!.title).toBe("【公告】版规更新公告");
       expect(articles[0]!.url).toBe("/article/example/123");
       expect(articles[0]!.author).toBe("alice");
-      expect(articles[2]!.title).toBe("【公告】发帖规范");
+      expect(articles[2]!.title).toBe("【置顶】版规说明");
       expect(articles[2]!.url).toBe("/article/example/789");
     });
 
