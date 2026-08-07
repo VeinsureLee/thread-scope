@@ -14,7 +14,7 @@ export function getDataDir(): string {
 
 /** 从 JSON 文件读取数据 */
 export function readJson<T>(filename: string): T | null {
-  const filePath = path.join(getDataDir(), filename);
+  const filePath = resolvePath(filename);
   if (!fs.existsSync(filePath)) return null;
   try {
     return JSON.parse(fs.readFileSync(filePath, "utf-8")) as T;
@@ -23,10 +23,24 @@ export function readJson<T>(filename: string): T | null {
   }
 }
 
-/** 将数据写入 JSON 文件 */
+/** 将数据写入 JSON 文件（整体覆盖） */
 export function writeJson(filename: string, data: unknown): void {
-  const filePath = path.join(getDataDir(), filename);
+  const filePath = resolvePath(filename);
   fs.writeFileSync(filePath, JSON.stringify(data, null, 2), "utf-8");
+}
+
+/** 追加一条记录到 JSON 数组文件（append-only，用于 search-results.json 快照） */
+export function appendArrayEntry<T>(filename: string, entry: T): void {
+  const filePath = resolvePath(filename);
+  const current = readJson<T[]>(filename) ?? [];
+  current.push(entry);
+  fs.writeFileSync(filePath, JSON.stringify(current, null, 2), "utf-8");
+}
+
+/** 解析存储路径：绝对路径原样使用，否则落到 data 目录 */
+function resolvePath(filename: string): string {
+  if (path.isAbsolute(filename)) return filename;
+  return path.join(getDataDir(), filename);
 }
 
 // ========== SQLite 存储（帖子内容、回复）— 待实现 ==========

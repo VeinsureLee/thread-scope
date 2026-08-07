@@ -9,6 +9,8 @@ import { registerFetchArticlesTool } from "./tools/fetch-articles.js";
 import { registerFetchTrafficTool } from "./tools/fetch-traffic.js";
 import { registerQueryTrafficHistoryTool } from "./tools/query-traffic-history.js";
 import { registerInitTool } from "./tools/init-tool.js";
+import { registerSearchArticlesTool } from "./tools/search-articles.js";
+import { registerSearchThreadsTool } from "./tools/search-threads.js";
 
 // ── 创建 MCP Server ──
 const server = new McpServer({
@@ -23,6 +25,8 @@ registerFetchArticlesTool(server);
 registerFetchTrafficTool(server);
 registerQueryTrafficHistoryTool(server);
 registerInitTool(server);
+registerSearchArticlesTool(server);
+registerSearchThreadsTool(server);
 
 // ── 启动 ──
 async function main(): Promise<void> {

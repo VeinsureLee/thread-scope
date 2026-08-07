@@ -6,3 +6,4 @@ export * from "./traffic.js";
 export * from "./article.js";
 export * from "./content.js";
 export * from "./user.js";
+export * from "./search.js";

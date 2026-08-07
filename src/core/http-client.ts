@@ -12,8 +12,21 @@ export function saveCookie(resp: AxiosResponse): void {
   const setCookie = resp.headers["set-cookie"];
   if (!setCookie) return;
   const cookies = Array.isArray(setCookie) ? setCookie : [setCookie];
-  const kv = cookies.map((c) => c.split(";")[0]!).join("; ");
-  globalCookie = globalCookie ? `${globalCookie}; ${kv}` : kv;
+
+  const map = new Map<string, string>();
+  // 现有 cookie（保持原有顺序与首键优先级：后面同名键覆盖前面）
+  for (const part of globalCookie.split("; ")) {
+    const idx = part.indexOf("=");
+    if (idx > 0) map.set(part.slice(0, idx), part.slice(idx + 1));
+  }
+  // 新 Set-Cookie：`name=value`（丢弃 Path/Max-Age 等元数据），同名键覆盖旧值
+  for (const c of cookies) {
+    const kv = c.split(";")[0]!.trim();
+    const idx = kv.indexOf("=");
+    if (idx > 0) map.set(kv.slice(0, idx), kv.slice(idx + 1));
+  }
+  // 重新拼装（保持插入顺序，重复键以最后值为准）
+  globalCookie = [...map.entries()].map(([k, v]) => `${k}=${v}`).join("; ");
 }
 
 /** 获取当前保存的 Cookie 字符串 */

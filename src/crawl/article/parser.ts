@@ -18,16 +18,22 @@ import type { ArticleRow } from "../../models/index.js";
  * 置顶识别：tr.top 或 .ico-pos-article-top 图标（docs/04 §1.3 — 修复旧 title_pinned 误用 .title_3）
  * 作者解析复用 crawl/user 身份解析（docs/01 §4.4）。
  *
- * @param boardName 版块英文名（article_row.board_ename 的来源）
- * @param html      版块文章列表页 HTML
+ * @param boardName  版块英文名（article_row.board_ename 的来源）
+ * @param html       版块文章列表页 HTML
+ * @param rowSelector 行选择器覆盖（默认 article_list.row_selector；
+ *                    搜索结果页表多 .tiz class，可传 selectors.search.result_table 收敛）
  * @returns 文章行列表
  */
-export function parseArticleList(boardName: string, html: string): ArticleRow[] {
+export function parseArticleList(
+  boardName: string,
+  html: string,
+  rowSelector?: string,
+): ArticleRow[] {
   const $ = load(html);
   const sel = selectors.article_list;
   const rows: ArticleRow[] = [];
 
-  $(sel.row_selector).each((_, tr) => {
+  $(rowSelector ?? sel.row_selector).each((_, tr) => {
     const $tr = $(tr);
 
     // 标题
