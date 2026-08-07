@@ -1,11 +1,13 @@
 import { ajaxGet } from "../../core/http-client.js";
+import { http } from "../../core/config.js";
 
 /**
  * 统一页面抓取器：在 ajaxGet 之上叠加【限速】与【重试】。
  *
  * 设计（见 docs/01 §4.2、docs/03 §4）：
  * - 所有领域模块的"拉 HTML 页面"都走这里，保证全站请求频率受控、失败可重试；
- * - 限速策略（已验收）：1 秒 50 次 = 每次请求至少间隔 20ms；
+ * - 限速策略：两次请求最小间隔 `request_interval_ms`（config/rules/http.yaml），
+ *   默认 20ms = 1 秒 50 次；
  * - 重试策略（已验收）：失败重试 3 次（共 4 次尝试）；
  * - 同一时刻只允许一个"等间距"请求序列（令牌队列），翻页并发时也不会突刺。
  */
@@ -16,8 +18,8 @@ export class PageFetcher {
   private nextAllowedAt = 0;
 
   constructor(opts: { intervalMs?: number; maxRetries?: number } = {}) {
-    // 默认 1 秒 50 次 → 20ms 间隔
-    this.intervalMs = opts.intervalMs ?? 20;
+    // 默认间隔从配置读取（http.request_interval_ms，默认 20ms）
+    this.intervalMs = opts.intervalMs ?? http.request_interval_ms;
     this.maxRetries = opts.maxRetries ?? 3;
   }
 

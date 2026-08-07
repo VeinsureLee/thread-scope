@@ -4,7 +4,7 @@ import { requireLogin } from "../auth/auth.js";
 import { resolveScope, searchBoards } from "../crawl/search/index.js";
 import { fetchForumTree } from "../crawl/structure/index.js";
 import { ContentDb } from "../storage/content-db.js";
-import { selectors } from "../core/config.js";
+import { selectors, DEFAULT_CONCURRENCY, MAX_CONCURRENCY } from "../core/config.js";
 
 /**
  * 注册版面内搜索工具（docs/03 §2.2 — forum-search-articles）。
@@ -57,9 +57,16 @@ export function registerSearchArticlesTool(server: McpServer): void {
           .boolean()
           .default(true)
           .describe("是否将命中文章写入 forum-content.db（默认 true，即默认入库，url_hash 去重）"),
+        concurrency: z
+          .number()
+          .int()
+          .positive()
+          .max(MAX_CONCURRENCY)
+          .default(DEFAULT_CONCURRENCY)
+          .describe(`同时搜索的版块数（并发度，默认 ${DEFAULT_CONCURRENCY}，上限 ${MAX_CONCURRENCY}）`),
       }),
     },
-    async ({ boardName, keyword, author, maxPages, maxItems, maxBoards, persist }) => {
+    async ({ boardName, keyword, author, maxPages, maxItems, maxBoards, persist, concurrency }) => {
       requireLogin();
 
       const start = Date.now();
@@ -69,6 +76,7 @@ export function registerSearchArticlesTool(server: McpServer): void {
         scope.boards,
         keyword,
         { author, maxPages, maxItems },
+        concurrency,
       );
       const elapsedMs = Date.now() - start;
 

@@ -98,4 +98,55 @@ describe("init/search — searchThreads", () => {
     );
     expect(hits).toHaveLength(0);
   });
+
+  it("正文抓取并发：多命中并发且保序返回", async () => {
+    // 两个版块 → 两个命中，正文抓取走并发池
+    const tree: ForumTreeNode[] = [
+      {
+        id: "sec-1",
+        name: "示例分区",
+        type: "section",
+        level: 1,
+        children: [
+          {
+            id: "board-Demo",
+            name: "示例版",
+            type: "board",
+            level: 2,
+            board: { name: "示例版", ename: "Demo", manager: [] },
+          },
+          {
+            id: "board-Demo2",
+            name: "示例版二",
+            type: "board",
+            level: 2,
+            board: { name: "示例版二", ename: "Demo2", manager: [] },
+          },
+        ],
+      },
+    ];
+
+    class MultiRepo extends FakeSearchRepo {
+      async fetch(path: string): Promise<string> {
+        await new Promise((r) => setTimeout(r, 5));
+        return resultPage();
+      }
+    }
+    class MultiThreadRepo extends FakeThreadRepo {
+      async fetch(path: string): Promise<string> {
+        await new Promise((r) => setTimeout(r, 5));
+        return DETAIL_PAGE;
+      }
+    }
+
+    const { hits } = await searchThreads(
+      "sec-1",
+      "示例",
+      { tree, maxThreads: 10, concurrency: 2 },
+      { searchRepo: new MultiRepo(), threadRepo: new MultiThreadRepo() },
+    );
+    expect(hits).toHaveLength(2);
+    // 保序：第一个命中来自第一个版块
+    expect(hits[0]!.articleId).toBe("1001");
+  });
 });

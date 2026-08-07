@@ -163,9 +163,23 @@ export interface HttpConfig {
   ajax_headers: Record<string, string>;
   timeout_ms: number;
   default_encoding: string;
+  /** 两次实际请求的最小间隔（毫秒），全站共享限速队列 */
+  request_interval_ms: number;
+  /** 异步并发（工作池）配置 */
+  concurrency: {
+    /** 默认并发度（跨版面搜索 / 正文抓取 / 分区流量） */
+    default: number;
+    /** 允许用户设置的最大并发度 */
+    max: number;
+  };
 }
 
 export const http = loadYaml<HttpConfig>("rules/http.yaml");
+
+/** 默认并发度（工作池 limit） */
+export const DEFAULT_CONCURRENCY = http.concurrency.default;
+/** 并发度上限（工具参数 zod 校验用） */
+export const MAX_CONCURRENCY = http.concurrency.max;
 
 // ============================================================
 // 便捷工具：路由变量替换

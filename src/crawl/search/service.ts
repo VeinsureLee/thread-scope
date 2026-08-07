@@ -2,6 +2,8 @@ import { load } from "cheerio";
 import { requireLogin } from "../../auth/auth.js";
 import type { ForumTreeNode, SearchResult } from "../../models/index.js";
 import { paginate, parsePagination } from "../common/paginator.js";
+import { mapWithConcurrency, poolValues } from "../common/async-pool.js";
+import { DEFAULT_CONCURRENCY } from "../../core/config.js";
 import { fetchForumTree } from "../structure/index.js";
 import { TrafficDb } from "../../storage/traffic-db.js";
 import { SearchRepository, HttpSearchRepository } from "./repository.js";
@@ -57,28 +59,36 @@ export async function searchBoardArticles(
 
 /**
  * 在指定版块列表内搜索（各版面独立，结果聚合）。
- * @param boardEnames 版块英文名列表
- * @param repo        数据访问实现（默认 HTTP，测试可注入 fake）
+ *
+ * 并发化（docs/05 搜索并发设计）：版面之间完全独立，用工作池并发，
+ * 同时最多 concurrency 个版面搜索在途；完成后按原版面顺序聚合。
+ * 请求频率仍由 PageFetcher 令牌队列统一兜底。
+ *
+ * @param boardEnames  版块英文名列表
+ * @param concurrency  并发度（默认 DEFAULT_CONCURRENCY，见 http.yaml）
+ * @param repo         数据访问实现（默认 HTTP，测试可注入 fake）
  */
 export async function searchBoards(
   boardEnames: string[],
   keyword: string,
   opts: { author?: string; maxPages?: number; maxItems?: number },
+  concurrency: number = DEFAULT_CONCURRENCY,
   repo: SearchRepository = new HttpSearchRepository(),
 ): Promise<SearchResult[]> {
-  const all: SearchResult[] = [];
-  const errors: string[] = [];
-  for (const ename of boardEnames) {
-    try {
-      all.push(...(await searchBoardArticles(ename, keyword, opts, repo)));
-    } catch (err) {
-      errors.push(`版面 [${ename}] 搜索失败: ${String(err)}`);
-    }
-  }
+  const results = await mapWithConcurrency(
+    boardEnames,
+    concurrency,
+    async (ename) => searchBoardArticles(ename, keyword, opts, repo),
+  );
+
+  const errors = results
+    .filter((r) => r.error !== undefined)
+    .map((r) => `版面 [${boardEnames[r.index]!}] 搜索失败: ${String(r.error)}`);
   if (errors.length > 0) {
     console.error("[search] 部分版面搜索失败:\n  " + errors.join("\n  "));
   }
-  return all;
+
+  return poolValues(results).flat();
 }
 
 /** 从论坛树收集全部版块英文名 */
@@ -169,6 +179,8 @@ export async function searchAllBoards(
     maxPagesPerBoard?: number;
     maxItemsPerBoard?: number;
     maxBoards?: number;
+    /** 并发度（默认 DEFAULT_CONCURRENCY） */
+    concurrency?: number;
   } = {},
   repo: SearchRepository = new HttpSearchRepository(),
 ): Promise<SearchResult[]> {
@@ -183,10 +195,10 @@ export async function searchAllBoards(
     limited,
     keyword,
     { author: opts.author, maxPages: opts.maxPagesPerBoard, maxItems: opts.maxItemsPerBoard },
+    opts.concurrency,
     repo,
   );
 }
-
 /** 搜索范围描述（快照记录 / 工具输出用） */
 export type SearchScope =
   | { kind: "board"; boardEname: string; boards: string[]; label: string }

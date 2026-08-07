@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { searchBoardArticles } from "../../src/crawl/search/service.js";
+import { searchBoardArticles, searchBoards } from "../../src/crawl/search/service.js";
 import type { SearchRepository } from "../../src/crawl/search/repository.js";
 
 // TrafficDb 打桩：getLatestAll 返回空 → 默认范围回退到论坛树前 N 版（确定性测试）
@@ -74,5 +74,61 @@ describe("crawl/search — searchBoardArticles", () => {
     expect(repo.requested[0]).toContain("b=Demo");
     expect(repo.requested[0]).toContain("t1=" + encodeURIComponent("示例"));
     expect(hits.length).toBeGreaterThan(0);
+  });
+});
+
+describe("crawl/search — searchBoards（并发池）", () => {
+  beforeEach(() => setTestCookie());
+  afterEach(() => clearCookie());
+
+  /** 记录 fetch 调用时在途并发峰值，并给每个版面打不同延迟 */
+  class TrackedRepo implements SearchRepository {
+    requested: string[] = [];
+    inFlight = 0;
+    peak = 0;
+
+    searchUrl(opts: { boardEname?: string; keyword: string; author?: string }): string {
+      let url = `/s/article?t1=${encodeURIComponent(opts.keyword)}&au=${opts.author ? encodeURIComponent(opts.author) : ""}`;
+      if (opts.boardEname) url += `&b=${encodeURIComponent(opts.boardEname)}`;
+      return url;
+    }
+
+    async fetch(path: string): Promise<string> {
+      this.inFlight++;
+      this.peak = Math.max(this.peak, this.inFlight);
+      try {
+        // 每个版面 10ms 延迟，制造重叠窗口（并发时 peak > 1）
+        await new Promise((r) => setTimeout(r, 10));
+        const board = path.match(/b=([^&]+)/)?.[1];
+        if (board === "Demo") return resultPage(RESULT_ROW_1, RESULT_ROW_2);
+        return resultPage();
+      } finally {
+        this.inFlight--;
+      }
+    }
+  }
+
+  it("并发度不超过 limit，且结果保序聚合", async () => {
+    const repo = new TrackedRepo();
+    const boards = ["Demo", "X1", "X2", "X3", "X4"];
+    const hits = await searchBoards(boards, "示例", {}, 2, repo);
+
+    expect(repo.peak).toBeLessThanOrEqual(2);
+    // 只有 Demo 有命中；结果含 Demo 的 2 条且先于其他版面
+    expect(hits.length).toBeGreaterThanOrEqual(2);
+    expect(hits[0]!.boardEname).toBe("Demo");
+  });
+
+  it("单版面失败不中断其他版面", async () => {
+    class FlakyRepo extends TrackedRepo {
+      async fetch(path: string): Promise<string> {
+        if (path.includes("b=Fail")) throw new Error("fail board");
+        return super.fetch(path);
+      }
+    }
+    const repo = new FlakyRepo();
+    const hits = await searchBoards(["Fail", "Demo"], "示例", {}, 2, repo);
+    expect(hits.length).toBeGreaterThanOrEqual(2);
+    expect(hits.every((h) => h.boardEname === "Demo")).toBe(true);
   });
 });

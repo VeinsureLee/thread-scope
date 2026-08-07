@@ -3,7 +3,7 @@ import { z } from "zod";
 import { requireLogin } from "../auth/auth.js";
 import { searchThreads } from "../init/search.js";
 import { ContentDb } from "../storage/content-db.js";
-import { selectors } from "../core/config.js";
+import { selectors, DEFAULT_CONCURRENCY, MAX_CONCURRENCY } from "../core/config.js";
 
 /**
  * 注册搜索帖子工具（docs/03 §2.2 — forum-search-threads）。
@@ -66,6 +66,13 @@ export function registerSearchThreadsTool(server: McpServer): void {
           .boolean()
           .default(true)
           .describe("是否将命中的文章与正文写入 forum-content.db（默认 true，即默认入库）"),
+        concurrency: z
+          .number()
+          .int()
+          .positive()
+          .max(MAX_CONCURRENCY)
+          .default(DEFAULT_CONCURRENCY)
+          .describe(`并发度（搜索版块与抓取正文，默认 ${DEFAULT_CONCURRENCY}，上限 ${MAX_CONCURRENCY}）`),
       }),
     },
     async ({
@@ -78,6 +85,7 @@ export function registerSearchThreadsTool(server: McpServer): void {
       maxThreads,
       maxThreadPages,
       persist,
+      concurrency,
     }) => {
       requireLogin();
 
@@ -89,6 +97,7 @@ export function registerSearchThreadsTool(server: McpServer): void {
         maxBoards,
         maxThreads,
         maxThreadPages,
+        concurrency,
       });
       const elapsedMs = Date.now() - start;
 

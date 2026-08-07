@@ -3,6 +3,7 @@ import { z } from "zod";
 import { requireLogin } from "../auth/auth.js";
 import { fetchTraffic, fetchAllTraffic } from "../crawl/traffic/index.js";
 import type { TrafficTreeNode } from "../models/index.js";
+import { DEFAULT_CONCURRENCY, MAX_CONCURRENCY } from "../core/config.js";
 
 /** 格式化单条流量统计 */
 function formatTraffic(t: {
@@ -55,14 +56,21 @@ export function registerFetchTrafficTool(server: McpServer): void {
           .describe(
             "可选，节点 ID，如 sec-0（分区）或 board-Demo（版面）。不传则爬取全站",
           ),
+        concurrency: z
+          .number()
+          .int()
+          .positive()
+          .max(MAX_CONCURRENCY)
+          .default(DEFAULT_CONCURRENCY)
+          .describe(`分区分组并发度（默认 ${DEFAULT_CONCURRENCY}，上限 ${MAX_CONCURRENCY}）`),
       }),
     },
-    async ({ nodeId }) => {
+    async ({ nodeId, concurrency }) => {
       requireLogin();
 
       const result = nodeId
-        ? await fetchTraffic(nodeId)
-        : await fetchAllTraffic();
+        ? await fetchTraffic(nodeId, { concurrency })
+        : await fetchAllTraffic({ concurrency });
 
       // 文本输出：树状视图
       const lines: string[] = [
