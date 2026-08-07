@@ -163,7 +163,7 @@ export function registerSearchThreadsTool(server: McpServer): void {
       });
       const elapsedMs = Date.now() - start;
 
-      // 落库：文章 + 正文（与 fetch-thread-content 同语义；命中帖子写入 post 表）
+      // 落库：文章 + 正文（命中帖子写入 post 表）
       if (persist) {
         const db = new ContentDb();
         try {

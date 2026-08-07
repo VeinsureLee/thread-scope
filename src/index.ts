@@ -17,7 +17,7 @@ import { registerSearchThreadsTool } from "./tools/search/search-threads.js";
 // ── 创建 MCP Server ──
 const server = new McpServer({
   name: "forum-mcp",
-  version: "0.1.0",
+  version: "1.0.0",
 });
 
 // ── 注册工具 ──

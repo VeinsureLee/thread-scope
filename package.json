@@ -11,7 +11,8 @@
     "start": "node build/index.js",
     "inspect": "npm run build && npx @modelcontextprotocol/inspector node build/index.js",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage"
   },
   "keywords": [],
   "author": "Veinsure Lee",
@@ -29,6 +30,7 @@
     "@types/iconv-lite": "^0.0.1",
     "@types/js-yaml": "^4.0.9",
     "@types/node": "^26.1.2",
+    "@vitest/coverage-v8": "^4.1.10",
     "tsx": "^4.23.5",
     "typescript": "^7.0.2",
     "vitest": "^4.1.10"
