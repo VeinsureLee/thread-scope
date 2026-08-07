@@ -3,9 +3,12 @@
 # ============================================================
 # 本文件定义论坛各页面 HTML 解析时使用的 CSS 选择器。
 # 如果论坛改版（模板/样式变更），只需修改此文件。
+#
+# 每条规则标注了来源 element 文档（docs/elements/*.md），便于验收核对。
 # ============================================================
 
 # ── 分区 AJAX JSON 响应（/section/ajax_list.json） ──
+# 来源：element-01
 # 返回 [{ t: "<a href='...'>名称</a>", id: "..." }, ...]
 # 通过 t 字段中 <a> 的 href 判断节点类型：
 #   /board/{ename}  → 版块（叶子，leaf）
@@ -16,25 +19,130 @@ section_ajax:
   board_href_keyword: "/board/"                # href 中包含 /board/ → 版块节点
   section_href_keyword: "/section/"            # href 中包含 /section/ → 分区节点
 
-# ── 版块列表 HTML（/section/{id}?count=1） ──
+# ── 版块列表 HTML（/section/{id}，与 ?count=1 同构，element-01/02） ──
+# 表格 table.board-list，thead 列：title_1 版面名称 / title_2 版主 /
+# title_3 最新主题 / title_4 在线 / title_5 今日 / title_6 主题 / title_7 文章
+# 版块行：<td class="title_1"><a href="/board/Demo">示例版</a><br>Demo</td>
+# 分区行：href 为 /section/xxx，版主单元格文本为 [二级目录]（traffic 解析时会跳过）
 board_list:
   row_selector: "table.board-list tbody tr"
   name: ".title_1 a"                           # 版块中文名（a 标签文本）
-  ename: ".title_1"                            # 版块英文名（从 title_1 全文中提取）
-  manager: ".title_2"                          # 版主单元格（含一个或多个版主链接）
-  manager_link: 'a[href*="/user/query/"]'       # 版主用户名链接（多版主时按链接逐个提取）
+  ename: ".title_1"                            # 版块英文名（从 <br> 后文本或 /board/{ename} 提取）
+  manager: ".title_2"                          # 版主单元格（含一个或多个版主链接 + 徽章图标）
+  manager_link: 'a[href*="/user/query/"]'       # 版主用户名链接（忽略 a.titles 徽章，因其 href="#"）
+  section_indicator: "[二级目录]"               # manager 单元格含此文本 → 分区行（解析时跳过）
   threads: ".title_6"                          # 主题数
-  posts: ".title_7"                            # 帖子数
+  posts: ".title_7"                            # 文章数
 
-# ── 版块统计（/section/{id}?count=1 HTML 中额外出现的列） ──
+# ── 版块统计（/section/{id} 与 ?count=1 同构，element-01/02） ──
 board_stats:
   online_users: ".title_4"                     # 当前在线人数
   today_posts: ".title_5"                      # 今日发帖数
 
-# ── 文章列表页（/board/{name}） ──
+# ── 文章列表页（/board/{ename}）与搜索结果页共用（element-03/06） ──
+# 表格 table.board-list（搜索页多一个 .tiz class），行 td class：title_8 / title_9 / title_10 /
+# title_12 / title_11 / title_10 / title_12
+#   title_8  → 类型图标（ico-pos-article-normal / ico-pos-article-top / ico-pos-article-light）
+#   title_9  → 标题链接 + threads-tab（多页标记）
+#   title_10 → 发帖日期（纯日期，如 2026-08-05）
+#   title_12 → 发帖人（第一个 a[href*="/user/query/"]，class=c63f）
+#   title_11 → 回复数
+#   title_10 → 最新回复日期/时间（行内第二个 title_10）
+#   title_12 → 最新回复人（class=c09f）
+# 置顶行：<tr class="top">，图标 ico-pos-article-top
 article_list:
-  row_selector: "table.board-list tbody tr, table.t-con tbody tr"
-  title_normal: ".title_9 a"                   # 普通帖标题
-  title_pinned: ".title_3 a"                   # 置顶/公告帖标题
-  author_link: 'a[href*="/user/query/"]'        # 作者链接（按 href 匹配）
-  date_regex: '\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}'  # 日期时间正则
+  row_selector: "table.board-list tbody tr"
+  title: ".title_9 a"                          # 标题链接（置顶/普通/精华帖标题都在此列）
+  threads_tab: ".threads-tab"                  # 多页帖子标记 [2][3]（可在标题后）
+  pinned_row: "tr.top"                         # 置顶行（class=top）
+  pinned_icon: ".ico-pos-article-top"          # 置顶图标（samp.tag 内的 class）
+  author_cell: ".title_12"                     # 作者列
+  author_link: 'a[href*="/user/query/"]'       # 作者链接（发帖人取第一个）
+  date_cell: ".title_10"                       # 发帖日期列（取第一个；行内第二个为最新回复日期）
+  last_reply_cell: ".title_10"                 # 最新回复日期/时间（取第二个，.eq(1)）
+  reply_count: ".title_11"                     # 回复数
+
+# 注：以下字段为旧版配置，已被上面字段取代，仅保留以兼容现有代码。
+#   - 旧 title_normal 误用 .title_9 a（正确）；旧 title_pinned 误用 .title_3 a（该列不存在，已废弃）
+#   - 旧 date_regex 要求"日期+时间"，但发帖日期是纯日期，不会匹配（已废弃）
+#   代码迁移到 crawl/article/ 模块时删除。
+  title_normal: ".title_9 a"
+  title_pinned: ".title_9 a"
+  date_regex: '\\d{4}-\\d{2}-\\d{2}\\s+\\d{2}:\\d{2}:\\d{2}'
+
+# ── 分页控件（文章列表 / 帖子楼层 / 搜索结果 共用，element-03/04/06） ──
+# <ul class="pagination"><li class="page-pre">主题数:<i>6211</i> 分页:</li><li><ol class="page-main">
+#   <li class="page-select"><a title="当前页">1</a></li>
+#   <li class="page-normal"><a href="/board/Demo?p=2" title="转到第2页">2</a></li>
+#   <li class="page-omit">...</li>
+#   <li class="page-normal"><a href="/board/Demo?p=2" title="下一页">&gt;&gt;</a></li>
+# </ol></li><li class="page-jump">...</li></ul>
+# 翻页参数：?p={n}（board/thread 已确认）；search 翻页参数待验收（element-06 仅当前页）
+pagination:
+  selector: "ul.pagination"
+  total: "li.page-pre i"                       # 总数（主题数 / 文章数 / 贴数）
+  current_page: "li.page-select a"             # 当前页码
+  page_links: "ol.page-main a[title^='转到第']" # 页码链接
+  next_link: "a[title='下一页']"               # 下一页链接
+  page_param: "p"                              # 翻页 URL 参数名
+
+# ── 帖子详情页（/article/{board}/{id}，element-04/07） ──
+# 结构：#body > .b-head(标题) > .b-content > 多个 .a-wrap.corner（每个是一楼层）
+# 每个 .a-wrap 含 table.article：tr.a-head / tr.a-body / tr.a-bottom，锚点 a[name="aN"]（N=楼层序号）
+thread_detail:
+  title: ".b-head span.n-left"                 # 标题栏文本："文章主题: xxx"
+  post_wrap: ".a-wrap"                         # 楼层容器（每层一个）
+  post_anchor: "a[name]"                       # 楼层锚点（aN → 楼层序号）
+  author_name: ".a-u-name"                     # 作者名（实名含 a 链接；匿名纯文本，见 anonymous）
+  author_link: 'a[href*="/user/query/"]'       # 作者链接（详情页实名才有；匿名无）
+  author_sex_icon: ".a-u-sex samp"             # 性别/在线状态图标（title 属性 + ico-pos-* 类）
+  avatar: ".a-u-img img"                       # 头像（可空，默认图）
+  user_info: ".a-u-info"                       # 等级/文章/积分/星座（dl > dt/dd）
+  post_content: ".a-content .a-content-wrap"   # 正文/评论内容（首行为"发信人: ... 信区: ..."，含修改/来源标记）
+  post_image: "img"                            # 正文内图片（附件 src 形如 /att/{board}/{id}/{pid}）
+  post_pos: ".a-pos"                           # 楼层位置文本：楼主 / 沙发 / 板凳 / 第N楼
+  # 楼层号推导：楼主=1楼；沙发=2楼；板凳=3楼；第N楼=N楼（锚点 aN 的 N 亦可直接作楼层序号）
+
+# ── 用户资料（弹窗，/user/query/{uid}，element-05） ──
+# 帖子内点击 <li><a href="/user/query/user_a">查看</a></li> 打开 ui-dialog，
+# 内容为 section.u-query。GET /user/query/{uid} 返回该弹窗 HTML。
+user_profile:
+  wrap: "section.u-query"                      # 资料容器
+  name: "header.u-name span"                   # 用户名
+  name_links: "header.u-name a"                # 发问候信 / 加好友 链接
+  avatar: "article.u-info figure img"          # 头像
+  base_info: "article.u-info dl"               # 基本信息（昵称/性别/星座/QQ/MSN/主页）
+  detail_info: "article.u-detail dl"           # 论坛属性（等级/特殊头衔/帖子总数/积分/生命力/上次登录/IP/当前状态）
+
+# ── 版面内搜索（/s/article，element-06） ──
+# <form method="get" action="/s/article" id="board_search">
+#   <input name="t1" placeholder="输入关键字">  ← 关键字
+#   <input name="au" placeholder="输入作者ID">  ← 作者（可选）
+#   <input type="checkbox" name="m">精华帖 / <input type="checkbox" name="a">带附件
+#   <input type="hidden" name="b" value="Demo">  ← 版面 ename
+# 搜索 URL：/s/article?b={boardName}&t1={keyword}[&au={author}][&m=on][&a=on]
+# 结果表：table.board-list.tiz，行结构与文章列表一致（复用 article_list）
+# 全站搜索：不传 b，遍历论坛树逐版面搜索（b 为必填时需先取版面列表）
+search:
+  path: "/s/article"
+  keyword_param: "t1"                          # 关键字
+  author_param: "au"                           # 作者 ID（可选）
+  board_param: "b"                             # 版面 ename（表单中为 hidden，恒有值）
+  essence_param: "m"                           # 精华帖 checkbox
+  attachment_param: "a"                        # 带附件 checkbox
+  result_table: "table.board-list.tiz"         # 结果表（行结构同 article_list）
+
+# ── 匿名版面（悄悄话 IWhisper） ──
+# 仅 IWhisper（悄悄话）为匿名版；版面内匿名/实名并存。
+# 匿名作者名形如 "IWhisper#123"（# 后数字每日重排，非持久身份）。
+#   - 列表页/搜索结果页：匿名作者【有】链接，href 形如 /user/query/IWhisper#123（含 # 与数字）
+#   - 帖子详情页：匿名作者【无】链接，<span class="a-u-name">IWhisper#123</span>
+#     且 .a-u-sex 内 <samp title="隐藏" class="ico-pos-offline-hide">
+#   - 正文首行来源："[FROM: 匿名天使的家]"
+anonymous:
+  board: "IWhisper"                            # 匿名版面 ename（唯一）
+  name_regex: '^IWhisper#\d+$'                 # 匿名占位名格式（单引号内 \d = 字面反斜杠+d）
+  uid_regex: '/user/query/IWhisper#\d+'        # 列表页匿名作者链接片段
+  hide_icon: ".ico-pos-offline-hide"           # 详情页匿名隐藏图标
+  hide_title: "隐藏"                           # 图标 title（"隐藏"）
+  from_anon: "匿名天使的家"                    # 发信来源标记（正文文本内）

@@ -4,3 +4,5 @@ export * from "./section.js";
 export * from "./tree.js";
 export * from "./traffic.js";
 export * from "./article.js";
+export * from "./content.js";
+export * from "./user.js";

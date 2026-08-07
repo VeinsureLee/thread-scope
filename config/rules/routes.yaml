@@ -20,9 +20,17 @@ section_detail: "/section/{sectionId}"           # 分区/版块详情页（HTML
 
 # ── 版块文章 ──
 board_articles: "/board/{boardName}"             # 版块文章列表页
+# 帖子详情页：/{board}/{id}，楼层分页 ?p={n}
+#   例：/article/Demo/1001 → 首帖；/article/Demo/1001?p=2 → 第 2 页楼层
+thread_detail: "/article/{board}/{id}"
+
+# ── 版面内搜索（/s/article） ──
+# 参数：b=版面ename、t1=关键字、au=作者ID(可选)、m=精华帖、a=带附件
+#   例：/s/article?b=Demo&t1=keyword
+search_path: "/s/article"
 
 # ── 用户相关（用于页面解析时的链接匹配） ──
-user_query: "/user/query/"                      # 用户信息页前缀
+user_query: "/user/query/"                      # 用户信息页前缀（详情页内 /user/query/{uid} 弹窗）
 
 # ── 分区树递归参数 ──
 tree_root_param: "list-section"                  # 根级参数值：root=list-section

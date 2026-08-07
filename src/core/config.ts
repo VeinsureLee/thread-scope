@@ -51,6 +51,8 @@ export interface RoutesConfig {
   sections_ajax: string;
   section_detail: string;
   board_articles: string;
+  thread_detail: string;
+  search_path: string;
   user_query: string;
   tree_root_param: string;
   tree_recursive_param: string;
@@ -73,6 +75,7 @@ export interface SelectorsConfig {
     ename: string;
     manager: string;
     manager_link: string;
+    section_indicator: string;
     threads: string;
     posts: string;
   };
@@ -82,10 +85,64 @@ export interface SelectorsConfig {
   };
   article_list: {
     row_selector: string;
+    title: string;
+    threads_tab: string;
+    pinned_row: string;
+    pinned_icon: string;
+    author_cell: string;
+    author_link: string;
+    date_cell: string;
+    last_reply_cell: string;
+    reply_count: string;
     title_normal: string;
     title_pinned: string;
-    author_link: string;
     date_regex: string;
+  };
+  pagination: {
+    selector: string;
+    total: string;
+    current_page: string;
+    page_links: string;
+    next_link: string;
+    page_param: string;
+  };
+  thread_detail: {
+    title: string;
+    post_wrap: string;
+    post_anchor: string;
+    author_name: string;
+    author_link: string;
+    author_sex_icon: string;
+    avatar: string;
+    user_info: string;
+    post_content: string;
+    post_image: string;
+    post_pos: string;
+  };
+  user_profile: {
+    wrap: string;
+    name: string;
+    name_links: string;
+    avatar: string;
+    base_info: string;
+    detail_info: string;
+  };
+  search: {
+    path: string;
+    keyword_param: string;
+    author_param: string;
+    board_param: string;
+    essence_param: string;
+    attachment_param: string;
+    result_table: string;
+  };
+  anonymous: {
+    board: string;
+    name_regex: string;
+    uid_regex: string;
+    hide_icon: string;
+    hide_title: string;
+    from_anon: string;
   };
 }
 
