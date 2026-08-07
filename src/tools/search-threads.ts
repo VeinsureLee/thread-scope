@@ -17,9 +17,9 @@ export function registerSearchThreadsTool(server: McpServer): void {
   server.registerTool(
     "forum-search-threads",
     {
-      title: "搜索帖子并抓取正文",
+      title: "搜索 · 搜索帖子并抓取正文",
       description:
-        "在指定版块/分区内按关键字搜索，并抓取命中帖子的正文与全部评论。范围：传版块英文名=单版面；传分区节点ID=递归该分区；不传=默认搜流量最大的前5个版块；不传且传maxBoards=全站搜索（约3分钟）。结果可选写入 forum-content.db（persist=true）。需要先执行 forum-login。",
+        "分类: 搜索。在指定版块/分区内按关键字搜索，并抓取命中帖子的正文与全部评论。范围：传版块英文名=单版面；传分区节点ID=递归该分区；不传=默认搜流量最大的前5个版块；不传且传maxBoards=全站搜索（约3分钟）。结果可选写入 forum-content.db（persist=true）。需要先执行 forum-login。",
       inputSchema: z.object({
         boardName: z
           .string()
@@ -64,8 +64,8 @@ export function registerSearchThreadsTool(server: McpServer): void {
           .describe("每篇文章楼层的最大页数（默认 5）"),
         persist: z
           .boolean()
-          .optional()
-          .describe("是否将命中的文章与正文写入 forum-content.db（默认 true）"),
+          .default(true)
+          .describe("是否将命中的文章与正文写入 forum-content.db（默认 true，即默认入库）"),
       }),
     },
     async ({
@@ -93,7 +93,7 @@ export function registerSearchThreadsTool(server: McpServer): void {
       const elapsedMs = Date.now() - start;
 
       // 落库：文章 + 正文（与 fetch-thread-content 同语义；命中帖子写入 post 表）
-      if (persist ?? true) {
+      if (persist) {
         const db = new ContentDb();
         try {
           for (const hit of hits) {

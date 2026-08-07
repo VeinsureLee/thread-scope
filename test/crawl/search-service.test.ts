@@ -1,8 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import * as fs from "fs";
-import * as os from "os";
-import * as path from "path";
-import { searchBoardArticles, searchAndSnapshot } from "../../src/crawl/search/service.js";
+import { searchBoardArticles } from "../../src/crawl/search/service.js";
 import type { SearchRepository } from "../../src/crawl/search/repository.js";
 
 // TrafficDb 打桩：getLatestAll 返回空 → 默认范围回退到论坛树前 N 版（确定性测试）
@@ -48,31 +45,11 @@ class FakeSearchRepo implements SearchRepository {
 
 // 登录状态：直接注入假 cookie（绕过 requireLogin）
 import { saveCookie, clearCookie } from "../../src/core/http-client.js";
-import type { ForumTreeNode } from "../../src/models/index.js";
 
 /** 注入一个测试 cookie（saveCookie 需要 AxiosResponse 形态） */
 function setTestCookie(): void {
   saveCookie({ headers: { "set-cookie": "test_cookie=1" } } as never);
 }
-
-/** 合成论坛树：Demo 版块（避免真实网络） */
-const FAKE_TREE: ForumTreeNode[] = [
-  {
-    id: "sec-1",
-    name: "示例分区",
-    type: "section",
-    level: 1,
-    children: [
-      {
-        id: "board-Demo",
-        name: "示例版",
-        type: "board",
-        level: 2,
-        board: { name: "示例版", ename: "Demo", manager: [] },
-      },
-    ],
-  },
-];
 
 describe("crawl/search — searchBoardArticles", () => {
   beforeEach(() => setTestCookie());
@@ -97,39 +74,5 @@ describe("crawl/search — searchBoardArticles", () => {
     expect(repo.requested[0]).toContain("b=Demo");
     expect(repo.requested[0]).toContain("t1=" + encodeURIComponent("示例"));
     expect(hits.length).toBeGreaterThan(0);
-  });
-});
-
-describe("crawl/search — searchAndSnapshot（快照 append-only）", () => {
-  let tmpFile: string;
-
-  beforeEach(() => {
-    setTestCookie();
-    tmpFile = path.join(os.tmpdir(), `search-snapshot-${process.pid}-${Math.random().toString(36).slice(2)}.json`);
-  });
-
-  afterEach(() => {
-    clearCookie();
-    if (fs.existsSync(tmpFile)) fs.unlinkSync(tmpFile);
-  });
-
-  it("写入一条快照记录；重复调用追加；默认范围=流量前N版", async () => {
-    const repo = new FakeSearchRepo("Demo");
-    await searchAndSnapshot(
-      { keyword: "示例", maxPages: 2, tree: FAKE_TREE },
-      tmpFile,
-      repo,
-    );
-    await searchAndSnapshot(
-      { keyword: "示例", maxPages: 2, tree: FAKE_TREE },
-      tmpFile,
-      repo,
-    );
-
-    const records = JSON.parse(fs.readFileSync(tmpFile, "utf-8")) as Array<{ keyword: string; scope: string; hitCount: number }>;
-    expect(records).toHaveLength(2);
-    expect(records[0]!.keyword).toBe("示例");
-    expect(records[0]!.scope).toBe("流量前1版");
-    expect(records[0]!.hitCount).toBeGreaterThan(0);
   });
 });

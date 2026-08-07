@@ -7,9 +7,9 @@ export function registerInitTool(server: McpServer): void {
   server.registerTool(
     "forum-init",
     {
-      title: "初始化论坛数据",
+      title: "初始化 · 一键初始化论坛数据",
       description:
-        "一键爬取论坛全站结构、各版块首页文章并保存到本地。需要先执行 forum-login。",
+        "分类: 初始化。一键爬取论坛全站结构、各版块首页文章并保存到本地。需要先执行 forum-login。",
       inputSchema: z.object({}),
     },
     async () => {

@@ -7,11 +7,11 @@ export function registerQueryTrafficHistoryTool(server: McpServer): void {
   server.registerTool(
     "forum-query-traffic-history",
     {
-      title: "查询版面历史流量",
+      title: "流量 · 查询版面历史流量",
       description:
-        "查询指定版面的历史流量采样（在线人数、今日发帖、主题数、文章总数随时间的变化）。可限定时间范围与返回条数。需要先执行过 forum-fetch-traffic 采集数据。",
+        "分类: 流量。查询指定版面的历史流量采样（在线人数、今日发帖、主题数、文章总数随时间的变化）。可限定时间范围与返回条数。需要先执行过 forum-fetch-traffic 采集数据。",
       inputSchema: z.object({
-        boardEname: z.string().min(1).describe("版面英文名，如 IWhisper、Advice"),
+        boardEname: z.string().min(1).describe("版面英文名，如 Demo"),
         from: z
           .string()
           .optional()

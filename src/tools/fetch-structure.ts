@@ -14,9 +14,9 @@ export function registerFetchStructureTool(server: McpServer): void {
   server.registerTool(
     "forum-fetch-structure",
     {
-      title: "获取论坛结构",
+      title: "结构 · 获取论坛结构",
       description:
-        "获取论坛完整分区/版块树状结构。不传参数时获取全站结构（含多级分区、版块）；传入 parentId 时仅获取该节点下的子节点。需要先执行 forum-login。",
+        "分类: 结构。获取论坛完整分区/版块树状结构。不传参数时获取全站结构（含多级分区、版块）；传入 parentId 时仅获取该节点下的子节点。需要先执行 forum-login。",
       inputSchema: z.object({
         parentId: z
           .string()

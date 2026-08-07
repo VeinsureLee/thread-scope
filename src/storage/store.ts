@@ -29,14 +29,6 @@ export function writeJson(filename: string, data: unknown): void {
   fs.writeFileSync(filePath, JSON.stringify(data, null, 2), "utf-8");
 }
 
-/** 追加一条记录到 JSON 数组文件（append-only，用于 search-results.json 快照） */
-export function appendArrayEntry<T>(filename: string, entry: T): void {
-  const filePath = resolvePath(filename);
-  const current = readJson<T[]>(filename) ?? [];
-  current.push(entry);
-  fs.writeFileSync(filePath, JSON.stringify(current, null, 2), "utf-8");
-}
-
 /** 解析存储路径：绝对路径原样使用，否则落到 data 目录 */
 function resolvePath(filename: string): string {
   if (path.isAbsolute(filename)) return filename;

@@ -1,8 +1,7 @@
 /**
- * 搜索（search）— 版面内搜索产出的候选与快照。
+ * 搜索（search）— 版面内搜索产出的候选与命中。
  *
- * 对应 data/search-results.json（docs/03 §2.3 #3 — JSON snapshot，与流量同逻辑：
- * append-only，每次搜索追加一条记录，便于日后整体入库 / 搜索历史分析）。
+ * 命中结果直接返回给调用方（工具/LLM），或由调用方自行落库/查询，不维护 JSON 快照。
  */
 import type { ArticleRow } from "./article.js";
 import type { Post } from "./content.js";
@@ -25,22 +24,4 @@ export interface SearchThreadHit {
   firstPost: Post;
   /** 全文评论（跨页翻页后的全部楼层） */
   replies: Post[];
-}
-
-/** 一次搜索产出的 JSON snapshot 记录（append-only） */
-export interface SearchSnapshot {
-  /** 采样时间（ISO） */
-  crawledAt: string;
-  /** 搜索关键字 */
-  keyword: string;
-  /** 搜索范围标签：版块名 / 分区名 / "流量前N版" / "全站" */
-  scope: string;
-  /** 单版面搜索时为版面 ename；分区/全站/流量前N 为 null */
-  boardEname: string | null;
-  /** 可选作者过滤（未传为 null） */
-  author: string | null;
-  /** 本次命中的文章数 */
-  hitCount: number;
-  /** 本次命中的文章（仅候选元数据；searchThreads 另含正文） */
-  hits: SearchResult[];
 }

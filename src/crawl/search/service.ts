@@ -1,9 +1,8 @@
 import { load } from "cheerio";
 import { requireLogin } from "../../auth/auth.js";
-import type { ForumTreeNode, SearchResult, SearchSnapshot } from "../../models/index.js";
+import type { ForumTreeNode, SearchResult } from "../../models/index.js";
 import { paginate, parsePagination } from "../common/paginator.js";
 import { fetchForumTree } from "../structure/index.js";
-import { appendArrayEntry } from "../../storage/store.js";
 import { TrafficDb } from "../../storage/traffic-db.js";
 import { SearchRepository, HttpSearchRepository } from "./repository.js";
 import { parseSearchResults } from "./parser.js";
@@ -59,12 +58,13 @@ export async function searchBoardArticles(
 /**
  * 在指定版块列表内搜索（各版面独立，结果聚合）。
  * @param boardEnames 版块英文名列表
+ * @param repo        数据访问实现（默认 HTTP，测试可注入 fake）
  */
-async function searchBoards(
+export async function searchBoards(
   boardEnames: string[],
   keyword: string,
   opts: { author?: string; maxPages?: number; maxItems?: number },
-  repo: SearchRepository,
+  repo: SearchRepository = new HttpSearchRepository(),
 ): Promise<SearchResult[]> {
   const all: SearchResult[] = [];
   const errors: string[] = [];
@@ -245,65 +245,4 @@ export function resolveScope(
     label: `流量前${enames.length}版`,
     source,
   };
-}
-
-/**
- * 按范围搜索 + 记录 JSON snapshot（append-only）。
- *
- * 范围解析（docs/03 §2.3 #3 + 2026-08-07 决策）：
- * - nodeId = 版面 ename → 单版面搜索
- * - nodeId = 分区节点 ID → 递归该分区下所有版块
- * - nodeId 缺省 + maxBoards 指定 → 全站搜索（用时长，工具层注明）
- * - nodeId 缺省 + maxBoards 未指定 → 默认搜流量最高的前 5 个版面
- *
- * 快照记录含搜索参数、范围与命中（append-only，data/search-results.json）。
- *
- * @param snapshotFile 快照文件路径（绝对路径直写；相对路径落到 data 目录）
- */
-export async function searchAndSnapshot(
-  opts: {
-    nodeId?: string;
-    keyword: string;
-    author?: string;
-    maxPages?: number;
-    maxItems?: number;
-    maxBoards?: number;
-    topCount?: number;
-    /** 测试注入：论坛树（默认从 structure-overview.json 缓存或爬取） */
-    tree?: ForumTreeNode[];
-  },
-  snapshotFile: string,
-  repo: SearchRepository = new HttpSearchRepository(),
-): Promise<{
-  scope: SearchScope;
-  hits: SearchResult[];
-  snapshot: SearchSnapshot;
-  elapsedMs: number;
-}> {
-  requireLogin();
-
-  const start = Date.now();
-  const tree = opts.tree ?? (await fetchForumTree());
-  const scope = resolveScope(opts.nodeId, tree, opts.topCount ?? 5, opts.maxBoards);
-
-  const hits = await searchBoards(
-    scope.boards,
-    opts.keyword,
-    { author: opts.author, maxPages: opts.maxPages, maxItems: opts.maxItems },
-    repo,
-  );
-  const elapsedMs = Date.now() - start;
-
-  const snapshot: SearchSnapshot = {
-    crawledAt: new Date().toISOString(),
-    keyword: opts.keyword,
-    scope: scope.label,
-    boardEname: scope.boardEname,
-    author: opts.author ?? null,
-    hitCount: hits.length,
-    hits,
-  };
-  appendArrayEntry<SearchSnapshot>(snapshotFile, snapshot);
-
-  return { scope, hits, snapshot, elapsedMs };
 }

@@ -7,9 +7,9 @@ export function registerLoginTool(server: McpServer): void {
   server.registerTool(
     "forum-login",
     {
-      title: "论坛登录",
+      title: "认证 · 论坛登录",
       description:
-        "登录目标论坛，获取认证 Cookie。所有爬取工具调用前必须先执行此工具。",
+        "分类: 认证。登录目标论坛，获取认证 Cookie。所有爬取工具调用前必须先执行此工具。",
       inputSchema: z.object({}),
     },
     async () => {

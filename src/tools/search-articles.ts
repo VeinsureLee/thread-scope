@@ -1,7 +1,8 @@
 import type { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
 import { requireLogin } from "../auth/auth.js";
-import { searchAndSnapshot } from "../crawl/search/index.js";
+import { resolveScope, searchBoards } from "../crawl/search/index.js";
+import { fetchForumTree } from "../crawl/structure/index.js";
 import { ContentDb } from "../storage/content-db.js";
 import { selectors } from "../core/config.js";
 
@@ -14,15 +15,16 @@ import { selectors } from "../core/config.js";
  *   - boardName=分区节点 ID → 递归该分区下所有版块
  *   - 不传 boardName + maxBoards → 全站搜索（约 3 分钟，工具会注明用时）
  *   - 不传 boardName → 默认搜流量最高的前 5 个版面
- * - 每次搜索写一条 JSON snapshot（data/search-results.json，append-only）。
+ * - 命中候选可选落库 forum-content.db（article 表，url_hash 去重，重复搜索不重复入库；
+ *   persist=false 可只查不写）。
  */
 export function registerSearchArticlesTool(server: McpServer): void {
   server.registerTool(
     "forum-search-articles",
     {
-      title: "搜索文章",
+      title: "搜索 · 搜索文章",
       description:
-        "在指定版块/分区内按关键字搜索文章（返回候选列表：标题/URL/作者/日期/回复数），不直接抓取正文；需要正文请调用 forum-fetch-thread-content。范围：传版块英文名=单版面；传分区节点ID=递归该分区；不传=默认搜流量最大的前5个版块；不传且传maxBoards=全站搜索（约3分钟）。每次搜索记录JSON快照（search-results.json）。需要先执行forum-login。",
+        "分类: 搜索。在指定版块/分区内按关键字搜索文章（返回候选列表：标题/URL/作者/日期/回复数），不直接抓取正文；需要正文请调用 forum-fetch-thread-content。范围：传版块英文名=单版面；传分区节点ID=递归该分区；不传=默认搜流量最大的前5个版块；不传且传maxBoards=全站搜索（约3分钟）。结果可选写入 forum-content.db（persist=true，url_hash 去重不重复入库）。需要先执行forum-login。",
       inputSchema: z.object({
         boardName: z
           .string()
@@ -51,26 +53,27 @@ export function registerSearchArticlesTool(server: McpServer): void {
           .max(500)
           .optional()
           .describe("全站搜索时最多搜索的版块数（不传 boardName 且传此参数 = 全站搜索，约 3 分钟）"),
+        persist: z
+          .boolean()
+          .default(true)
+          .describe("是否将命中文章写入 forum-content.db（默认 true，即默认入库，url_hash 去重）"),
       }),
     },
-    async ({ boardName, keyword, author, maxPages, maxItems, maxBoards }) => {
+    async ({ boardName, keyword, author, maxPages, maxItems, maxBoards, persist }) => {
       requireLogin();
 
-      const { scope, hits, elapsedMs } = await searchAndSnapshot(
-        {
-          nodeId: boardName,
-          keyword,
-          author,
-          maxPages,
-          maxItems,
-          maxBoards,
-        },
-        "search-results.json",
+      const start = Date.now();
+      const tree = await fetchForumTree();
+      const scope = resolveScope(boardName, tree, 5, maxBoards);
+      const hits = await searchBoards(
+        scope.boards,
+        keyword,
+        { author, maxPages, maxItems },
       );
+      const elapsedMs = Date.now() - start;
 
-      // 命中候选可选落库（article 表，先保证 board 存在满足外键）
-      const isAnonBoard = boardName === selectors.anonymous.board;
-      if (hits.length > 0) {
+      // 命中候选可选落库（article 表，先保证 board 存在满足外键；url_hash 去重不重复入库）
+      if (persist && hits.length > 0) {
         const db = new ContentDb();
         try {
           const rows = hits.map((h) => h.row);

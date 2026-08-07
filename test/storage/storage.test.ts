@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { readJson, writeJson, appendArrayEntry } from "../../src/storage/store.js";
+import { readJson, writeJson } from "../../src/storage/store.js";
 import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
@@ -56,13 +56,5 @@ describe("JSON 存储 (store)", () => {
     writeJson(tmpPath("structure.json"), forum);
     const data = readJson<typeof forum>(tmpPath("structure.json"));
     expect(data).toEqual(forum);
-  });
-
-  it("appendArrayEntry 追加记录（append-only）", () => {
-    const f = tmpPath("snap.json");
-    appendArrayEntry(f, { k: 1 });
-    appendArrayEntry(f, { k: 2 });
-    const data = readJson<Array<{ k: number }>>(f);
-    expect(data).toEqual([{ k: 1 }, { k: 2 }]);
   });
 });

@@ -45,15 +45,15 @@ export function registerFetchTrafficTool(server: McpServer): void {
   server.registerTool(
     "forum-fetch-traffic",
     {
-      title: "获取版面/分区流量",
+      title: "流量 · 获取版面/分区流量",
       description:
-        "获取版面的流量信息（在线人数、今日发帖、主题数、文章总数），以树状结构返回。不传参数时爬取全站所有版面的流量并写入数据库；传入版面/分区 ID 时只爬取该节点下的版面。section 节点返回其下全部版面的聚合统计（有版面未统计则为 null）。流量采样会异步写入数据库供历史查询。需要先执行 forum-login。",
+        "分类: 流量。获取版面的流量信息（在线人数、今日发帖、主题数、文章总数），以树状结构返回。不传参数时爬取全站所有版面的流量并写入数据库；传入版面/分区 ID 时只爬取该节点下的版面。section 节点返回其下全部版面的聚合统计（有版面未统计则为 null）。流量采样会异步写入数据库供历史查询。需要先执行 forum-login。",
       inputSchema: z.object({
         nodeId: z
           .string()
           .optional()
           .describe(
-            "可选，节点 ID，如 sec-0（分区）或 board-JobInfo（版面）。不传则爬取全站",
+            "可选，节点 ID，如 sec-0（分区）或 board-Demo（版面）。不传则爬取全站",
           ),
       }),
     },

@@ -4,8 +4,8 @@
  */
 export {
   searchBoardArticles,
+  searchBoards,
   searchAllBoards,
-  searchAndSnapshot,
   resolveScope,
   type SearchScope,
 } from "./service.js";

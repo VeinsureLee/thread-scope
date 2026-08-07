@@ -16,11 +16,11 @@ export function registerFetchArticlesTool(server: McpServer): void {
   server.registerTool(
     "forum-fetch-board-articles",
     {
-      title: "获取版块文章列表",
+      title: "文章 · 获取版块文章列表",
       description:
-        "爬取指定版块的文章列表（含标题、作者、日期、回复数、置顶标记）。可指定翻页数量上限。结果写入 forum-content.db 的 article 表。需要先执行 forum-login。",
+        "分类: 文章。爬取指定版块的文章列表（含标题、作者、日期、回复数、置顶标记）。可指定翻页数量上限。结果写入 forum-content.db 的 article 表。需要先执行 forum-login。",
       inputSchema: z.object({
-        boardName: z.string().min(1).describe("版块英文名，如 Beauty"),
+        boardName: z.string().min(1).describe("版块英文名，如 Demo"),
         maxPages: z
           .number()
           .int()
