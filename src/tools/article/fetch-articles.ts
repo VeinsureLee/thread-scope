@@ -1,10 +1,10 @@
 import type { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
-import { requireLogin } from "../auth/auth.js";
-import { fetchBoardArticles } from "../crawl/article/index.js";
-import { ContentDb } from "../storage/content-db.js";
-import { selectors } from "../core/config.js";
-import { registerLoggedTool } from "./with-logging.js";
+import { requireLogin } from "../../auth/auth.js";
+import { fetchBoardArticles } from "../../crawl/article/index.js";
+import { ContentDb } from "../../storage/content-db.js";
+import { selectors } from "../../core/config.js";
+import { registerLoggedTool } from "../with-logging.js";
 
 /**
  * 注册获取版块文章列表工具。

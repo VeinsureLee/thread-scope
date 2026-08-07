@@ -1,7 +1,7 @@
 import type { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
-import { TrafficDb } from "../storage/traffic-db.js";
-import { registerLoggedTool } from "./with-logging.js";
+import { TrafficDb } from "../../storage/traffic-db.js";
+import { registerLoggedTool } from "../with-logging.js";
 
 /** 注册历史流量查询工具 */
 export function registerQueryTrafficHistoryTool(server: McpServer): void {

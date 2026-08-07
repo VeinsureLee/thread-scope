@@ -94,4 +94,61 @@ describe("storage — ContentDb", () => {
     db.saveThread("Demo", meta, [], post, []);
     expect(db.getThreadPosts(db.findArticleIdByUrl(meta.url)!)).toHaveLength(1);
   });
+
+  it("searchArticles：本地搜索文章（标题 LIKE）", () => {
+    db.upsertBoard("Demo", "示例版", false);
+    db.upsertArticle({
+      boardEname: "Demo",
+      title: "北京邮电大学招生",
+      url: "/article/Demo/3001",
+      date: "2026-08-01",
+      isPinned: false,
+      authorUid: null,
+      authorRaw: "someone",
+      replyCount: 0,
+      lastReply: "",
+      lastReplierUid: null,
+    });
+    db.upsertArticle({
+      boardEname: "Demo",
+      title: "无关标题",
+      url: "/article/Demo/3002",
+      date: "2026-08-02",
+      isPinned: false,
+      authorUid: null,
+      authorRaw: "someone2",
+      replyCount: 0,
+      lastReply: "",
+      lastReplierUid: null,
+    });
+
+    const hits = db.searchArticles("邮电");
+    expect(hits).toHaveLength(1);
+    expect(hits[0]!.title).toBe("北京邮电大学招生");
+    expect(hits[0]!.boardEname).toBe("Demo");
+
+    // boardEname 限定
+    expect(db.searchArticles("招生", { boardEname: "Other" })).toHaveLength(0);
+    expect(db.searchArticles("招生", { boardEname: "Demo" })).toHaveLength(1);
+  });
+
+  it("searchThreadsContent：本地搜索帖子正文（content LIKE）", () => {
+    db.upsertBoard("Demo", "示例版", false);
+    db.saveThread(
+      "Demo",
+      { url: "/article/Demo/4001", title: "考研经验帖" },
+      [],
+      {
+        floor: 1, kind: "article", authorUid: null, authorRaw: "a",
+        isAnon: false, content: "这是关于计算机考研的复习心得", images: [], postTime: null, posText: "楼主",
+      },
+      [],
+    );
+
+    const hits = db.searchThreadsContent("计算机考研");
+    expect(hits).toHaveLength(1);
+    expect(hits[0]!.articleTitle).toBe("考研经验帖");
+    expect(hits[0]!.kind).toBe("article");
+    expect(hits[0]!.content).toContain("计算机考研");
+  });
 });

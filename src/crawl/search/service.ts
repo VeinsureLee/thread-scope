@@ -207,14 +207,80 @@ export type SearchScope =
   | { kind: "section"; boardEname: null; boards: string[]; label: string }
   | { kind: "all"; boardEname: null; boards: string[]; label: string };
 
-/** 解析搜索范围：版块名 / 节点 ID / 全站 */
+/**
+ * 解析搜索范围（显式 scope 语义）。
+ *
+ * scope（架构优化定稿，消除「不传 boardName + 传 maxBoards = 全站」的隐晦）：
+ *   - "all"     → 全站全部版面（约 3 分钟）；maxBoards 可选限制最多搜 N 版
+ *   - "top"     → 流量最高前 topCount 个版面（默认 5，快）
+ *   - "board"   → 单版面（nodeId 为版块英文名）
+ *   - "section" → 递归该分区下所有版面（nodeId 为分区节点 ID）
+ *   - "auto"    → 按 nodeId/maxBoards 推断（兼容旧调用；nodeId → board/section，maxBoards → all，否则 top）
+ */
 export function resolveScope(
+  scope: "all" | "top" | "board" | "section" | "auto" | undefined,
   nodeId: string | undefined,
   tree: ForumTreeNode[],
   topCount: number,
   maxBoards: number | undefined,
 ): SearchScope {
-  // 单版面/分区：nodeId 命中（版块 → 单版面；分区 → 递归其下版块）
+  // 显式单版面
+  if (scope === "board") {
+    if (!nodeId) throw new Error("scope=board 时必须传 boardName（版块英文名）");
+    const matched = collectBoardsUnder(tree, nodeId);
+    if (!matched || matched.length === 0) {
+      throw new Error(`节点不存在: ${nodeId}。可传版块英文名（如 Demo）或分区节点 ID（如 sec-0）。`);
+    }
+    if (matched.length > 1) {
+      throw new Error(`节点 ${nodeId} 是分区，不是单个版块。scope=board 需单版面；要搜整个分区请用 scope=section。`);
+    }
+    return {
+      kind: "board" as const,
+      boardEname: matched[0]!,
+      boards: matched,
+      label: matched[0]!,
+    };
+  }
+
+  // 显式分区递归
+  if (scope === "section") {
+    if (!nodeId) throw new Error("scope=section 时必须传 boardName（分区节点 ID）");
+    const matched = collectBoardsUnder(tree, nodeId);
+    if (!matched || matched.length === 0) {
+      throw new Error(`节点不存在: ${nodeId}。可传分区节点 ID（如 sec-0）或版块英文名。`);
+    }
+    return {
+      kind: "section" as const,
+      boardEname: null,
+      boards: matched,
+      label: nodeId,
+    };
+  }
+
+  // 显式全站
+  if (scope === "all") {
+    const all = collectBoardEnames(tree);
+    return {
+      kind: "all" as const,
+      boardEname: null,
+      boards: maxBoards !== undefined && maxBoards < all.length ? all.slice(0, maxBoards) : all,
+      label: maxBoards !== undefined && maxBoards < all.length ? `全站前${maxBoards}版` : "全站",
+    };
+  }
+
+  // 显式流量前 N
+  if (scope === "top") {
+    const { enames, source } = topTrafficBoards(tree, topCount);
+    return {
+      kind: "top" as const,
+      boardEname: null,
+      boards: enames,
+      label: `流量前${enames.length}版`,
+      source,
+    };
+  }
+
+  // auto：按 nodeId / maxBoards 推断（兼容旧调用）
   if (nodeId) {
     const matched = collectBoardsUnder(tree, nodeId);
     if (matched) {
@@ -238,7 +304,6 @@ export function resolveScope(
     );
   }
 
-  // 显式全站：传 maxBoards（或不传 topCount 且要求全量）→ 全站搜索（用时长）
   if (maxBoards !== undefined) {
     const all = collectBoardEnames(tree);
     return {

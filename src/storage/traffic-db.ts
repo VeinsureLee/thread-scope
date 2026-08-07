@@ -1,11 +1,12 @@
 import { DatabaseSync } from "node:sqlite";
 import * as fs from "fs";
 import * as path from "path";
+import { fromRoot } from "../core/paths.js";
 import type { TrafficInfo, TrafficHistoryPoint } from "../models/index.js";
 
-/** 数据库文件路径（data/forum-traffic.db） */
+/** 数据库文件路径（data/forum-traffic.db，锚定项目根） */
 function dbFilePath(): string {
-  const dir = path.resolve(process.cwd(), "data");
+  const dir = fromRoot("data");
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
   return path.join(dir, "forum-traffic.db");
 }

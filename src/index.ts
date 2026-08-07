@@ -5,14 +5,14 @@ import { logInfo, logError, logFilePath } from "./logging/logger.js";
 import { attachValidationProbe } from "./logging/validation-probe.js";
 
 // ── 工具注册 ──
-import { registerLoginTool } from "./tools/login-tool.js";
-import { registerFetchStructureTool } from "./tools/fetch-structure.js";
-import { registerFetchArticlesTool } from "./tools/fetch-articles.js";
-import { registerFetchTrafficTool } from "./tools/fetch-traffic.js";
-import { registerQueryTrafficHistoryTool } from "./tools/query-traffic-history.js";
-import { registerInitTool } from "./tools/init-tool.js";
-import { registerSearchArticlesTool } from "./tools/search-articles.js";
-import { registerSearchThreadsTool } from "./tools/search-threads.js";
+import { registerLoginTool } from "./tools/auth/login.js";
+import { registerFetchStructureTool } from "./tools/structure/fetch-structure.js";
+import { registerFetchArticlesTool } from "./tools/article/fetch-articles.js";
+import { registerFetchTrafficTool } from "./tools/traffic/fetch-traffic.js";
+import { registerQueryTrafficHistoryTool } from "./tools/traffic/query-traffic-history.js";
+import { registerInitTool } from "./tools/init/init-tool.js";
+import { registerSearchArticlesTool } from "./tools/search/search-articles.js";
+import { registerSearchThreadsTool } from "./tools/search/search-threads.js";
 
 // ── 创建 MCP Server ──
 const server = new McpServer({

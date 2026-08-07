@@ -1,6 +1,7 @@
 import { DatabaseSync } from "node:sqlite";
 import * as fs from "fs";
 import * as path from "path";
+import { fromRoot } from "../core/paths.js";
 
 // ============================================================
 // db-common：SQLite 通用辅助（docs/01 §2.2 — 全项目唯一值得做成基类的点）
@@ -8,9 +9,9 @@ import * as path from "path";
 // 所有 *Db（TrafficDb / ContentDb）共享：打开连接、建目录、执行迁移、事务模板。
 // ============================================================
 
-/** data 目录绝对路径（不存在则创建） */
+/** data 目录绝对路径（锚定项目根；不存在则创建） */
 export function dataDir(): string {
-  const dir = path.resolve(process.cwd(), "data");
+  const dir = fromRoot("data");
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
   return dir;
 }

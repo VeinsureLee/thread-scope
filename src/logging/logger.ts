@@ -3,6 +3,7 @@ import * as path from "path";
 import { AsyncLocalStorage } from "node:async_hooks";
 import { randomUUID } from "node:crypto";
 import { logConfig } from "../core/config.js";
+import { fromRoot } from "../core/paths.js";
 
 /**
  * 统一 JSONL 日志。
@@ -50,11 +51,8 @@ const TO_STDERR = logConfig?.to_stderr ?? false;
 /** 命名空间过滤规则（配置读取）；空 = 不过滤（记录全部） */
 const INCLUDE_NS: string[] = logConfig?.include_ns ?? [];
 
-/** 日志文件绝对路径（相对项目根解析） */
-let LOG_FILE = path.resolve(
-  process.cwd(),
-  logConfig?.file ?? "data/logs/forum-mcp.log",
-);
+/** 日志文件绝对路径（锚定项目根，不依赖 cwd） */
+let LOG_FILE = fromRoot(logConfig?.file ?? "data/logs/forum-mcp.log");
 
 // 确保日志目录存在
 fs.mkdirSync(path.dirname(LOG_FILE), { recursive: true });

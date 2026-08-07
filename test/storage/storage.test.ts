@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { readJson, writeJson } from "../../src/storage/store.js";
+import { readJson, writeJson } from "../../src/storage/structure-store.js";
 import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";

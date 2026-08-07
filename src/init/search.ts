@@ -25,6 +25,8 @@ export async function searchThreads(
   nodeId: string | undefined,
   keyword: string,
   opts: {
+    /** 搜索范围：all/top/board/section；不传按 nodeId/maxBoards 自动推断 */
+    scope?: "all" | "top" | "board" | "section" | "auto";
     author?: string;
     maxPages?: number;
     maxItems?: number;
@@ -48,7 +50,7 @@ export async function searchThreads(
   requireLogin();
 
   const tree = opts.tree ?? (await fetchForumTree());
-  const scope = resolveScope(nodeId, tree, opts.topCount ?? 5, opts.maxBoards);
+  const scope = resolveScope(opts.scope, nodeId, tree, opts.topCount ?? 5, opts.maxBoards);
 
   // 逐版面搜索（scope.boards 已由 resolveScope 确定；避免 searchAllBoards 重复抓树）
   // 版面之间独立 → 工作池并发（与 searchBoards 一致，仅注入了 tree）

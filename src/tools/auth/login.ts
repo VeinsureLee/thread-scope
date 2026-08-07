@@ -1,7 +1,7 @@
 import type { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
-import { login } from "../auth/auth.js";
-import { registerLoggedTool } from "./with-logging.js";
+import { login } from "../../auth/auth.js";
+import { registerLoggedTool } from "../with-logging.js";
 
 /** 注册论坛登录工具 */
 export function registerLoginTool(server: McpServer): void {

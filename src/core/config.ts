@@ -2,12 +2,14 @@ import * as dotenv from "dotenv";
 import * as fs from "fs";
 import * as path from "path";
 import { load as yamlLoad } from "js-yaml";
+import { fromRoot } from "./paths.js";
 
 // ============================================================
 // .env 凭证（仅账号密码）
 // ============================================================
+// 显式从项目根读取 .env（不依赖 cwd：MCP 客户端可能从任意目录启动本进程）
 
-dotenv.config({ quiet: true });
+dotenv.config({ quiet: true, path: fromRoot(".env") });
 
 export const secrets = {
   userId: process.env.USER_ID || "",
@@ -18,7 +20,7 @@ export const secrets = {
 // YAML 配置加载
 // ============================================================
 
-const CONFIG_ROOT = path.resolve(process.cwd(), "config");
+const CONFIG_ROOT = fromRoot("config");
 
 function loadYaml<T>(filePath: string): T {
   const fullPath = path.resolve(CONFIG_ROOT, filePath);

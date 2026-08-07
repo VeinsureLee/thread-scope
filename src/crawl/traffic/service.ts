@@ -1,6 +1,5 @@
 import { routes, fillRoute, DEFAULT_CONCURRENCY } from "../../core/config.js";
 import { requireLogin } from "../../auth/auth.js";
-import { writeJson, readJson } from "../../storage/store.js";
 import { enqueueTrafficWrite } from "../../storage/traffic-queue.js";
 import { PageFetcher, defaultPageFetcher } from "../common/page-fetcher.js";
 import { mapWithConcurrency, poolValues } from "../common/async-pool.js";
@@ -12,15 +11,12 @@ import { parseSectionTraffic } from "./parser.js";
 import { buildTrafficTree } from "./tree.js";
 
 /**
- * 加载论坛树（缓存优先），无缓存则爬取并保存。
+ * 加载论坛树（缓存优先，无缓存则爬取并保存）。
  * 论坛树是流量树的骨架，只含静态字段（name/ename/manager）。
+ * 复用 structure 模块的缓存逻辑（fetchForumTree 已缓存优先）。
  */
 async function loadTree(): Promise<ForumTreeNode[]> {
-  const cached = readJson<{ tree: ForumTreeNode[] }>("structure-overview.json");
-  if (cached?.tree) return cached.tree;
-  const tree = await fetchForumTree();
-  writeJson("structure-overview.json", { crawledAt: new Date().toISOString(), tree });
-  return tree;
+  return fetchForumTree();
 }
 
 /**

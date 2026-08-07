@@ -1,7 +1,7 @@
 import type { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
-import { initForum } from "../init/init.js";
-import { registerLoggedTool } from "./with-logging.js";
+import { initForum } from "../../init/init.js";
+import { registerLoggedTool } from "../with-logging.js";
 
 /** 注册论坛初始化工具 */
 export function registerInitTool(server: McpServer): void {

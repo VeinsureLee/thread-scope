@@ -294,6 +294,121 @@ export class ContentDb {
     return row ? row.id : null;
   }
 
+  // ════════════ 本地搜索（缓存命中：先查库，再决定是否联网） ════════════
+
+  /**
+   * 本地搜索文章（article 表，标题 LIKE 匹配）。
+   *
+   * 缓存命中路径：之前搜索/抓取落库过的文章，从这里秒回，无需联网、无需登录。
+   *
+   * @param keyword 关键字（LIKE 通配符自动包裹，大小写不敏感）
+   * @param opts    { boardEname? 限定版面；limit? 返回上限 }
+   * @returns 命中文章行（含版块/标题/url/作者/日期/回复数）
+   */
+  searchArticles(
+    keyword: string,
+    opts: { boardEname?: string; limit?: number } = {},
+  ): ArticleRow[] {
+    let sql = `
+      SELECT a.board_ename, a.title, a.url, u.name AS author_raw,
+             a.is_pinned, a.crawled_at
+      FROM article a
+      LEFT JOIN user u ON u.id = a.author_uid
+      WHERE a.title LIKE ?
+    `;
+    const params: (string | number)[] = [`%${keyword}%`];
+    if (opts.boardEname) {
+      sql += ` AND a.board_ename = ?`;
+      params.push(opts.boardEname);
+    }
+    sql += ` ORDER BY a.crawled_at DESC`;
+    if (opts.limit) {
+      sql += ` LIMIT ?`;
+      params.push(opts.limit);
+    }
+    const rows = this.db.prepare(sql).all(...params) as unknown as Array<{
+      board_ename: string;
+      title: string;
+      url: string;
+      author_raw: string | null;
+      is_pinned: number;
+      crawled_at: string;
+    }>;
+    return rows.map((r) => ({
+      boardEname: r.board_ename,
+      title: r.title,
+      url: r.url,
+      date: r.crawled_at.slice(0, 10),
+      isPinned: !!r.is_pinned,
+      authorUid: null,
+      authorRaw: r.author_raw ?? "",
+      replyCount: 0,
+      lastReply: "",
+      lastReplierUid: null,
+    }));
+  }
+
+  /**
+   * 本地搜索帖子正文（post 表，content LIKE 匹配）。
+   *
+   * 缓存命中路径：之前抓取落库过的帖子正文，从这里秒回。
+   *
+   * @param keyword 关键字
+   * @param opts    { boardEname? 限定版面；limit? 返回上限 }
+   * @returns 命中楼层（含所属文章标题/url、楼层号、正文、作者）
+   */
+  searchThreadsContent(
+    keyword: string,
+    opts: { boardEname?: string; limit?: number } = {},
+  ): Array<{
+    boardEname: string;
+    articleTitle: string;
+    articleUrl: string;
+    floor: number;
+    kind: "article" | "reply";
+    authorRaw: string;
+    content: string;
+    postTime: string | null;
+  }> {
+    let sql = `
+      SELECT a.board_ename, a.title AS article_title, a.url AS article_url,
+             p.floor, p.kind, p.author_raw, p.content, p.post_time
+      FROM post p
+      JOIN article a ON a.id = p.article_id
+      WHERE p.content LIKE ?
+    `;
+    const params: (string | number)[] = [`%${keyword}%`];
+    if (opts.boardEname) {
+      sql += ` AND a.board_ename = ?`;
+      params.push(opts.boardEname);
+    }
+    sql += ` ORDER BY p.crawled_at DESC`;
+    if (opts.limit) {
+      sql += ` LIMIT ?`;
+      params.push(opts.limit);
+    }
+    const rows = this.db.prepare(sql).all(...params) as unknown as Array<{
+      board_ename: string;
+      article_title: string;
+      article_url: string;
+      floor: number;
+      kind: "article" | "reply";
+      author_raw: string;
+      content: string;
+      post_time: string | null;
+    }>;
+    return rows.map((r) => ({
+      boardEname: r.board_ename,
+      articleTitle: r.article_title,
+      articleUrl: r.article_url,
+      floor: r.floor,
+      kind: r.kind,
+      authorRaw: r.author_raw,
+      content: r.content,
+      postTime: r.post_time,
+    }));
+  }
+
   /** 关闭连接 */
   close(): void {
     this.db.close();

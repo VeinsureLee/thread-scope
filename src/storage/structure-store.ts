@@ -1,11 +1,17 @@
 import * as fs from "fs";
 import * as path from "path";
+import { fromRoot } from "../core/paths.js";
 
-// ========== JSON 存储（轻量数据：论坛结构、版块统计） ==========
+/**
+ * JSON 文件存储（轻量数据：论坛结构快照 structure-overview.json 等）。
+ *
+ * 与 SQLite（content-db / traffic-db）分工：结构化、需查询的数据进 SQLite；
+ * 一次性快照（如完整论坛树）用 JSON 文件，整体读、整体写。
+ */
 
-/** 获取 data 目录路径 */
+/** 获取 data 目录路径（锚定项目根） */
 export function getDataDir(): string {
-  const dir = path.resolve(process.cwd(), "data");
+  const dir = fromRoot("data");
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true });
   }
@@ -34,11 +40,3 @@ function resolvePath(filename: string): string {
   if (path.isAbsolute(filename)) return filename;
   return path.join(getDataDir(), filename);
 }
-
-// ========== SQLite 存储（帖子内容、回复）— 待实现 ==========
-
-/**
- * 【计划中】获取 SQLite 数据库连接。
- * 依赖 better-sqlite3，届时添加。
- */
-// export function getDb(): Database.Database { ... }

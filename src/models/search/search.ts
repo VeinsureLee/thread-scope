@@ -3,8 +3,8 @@
  *
  * 命中结果直接返回给调用方（工具/LLM），或由调用方自行落库/查询，不维护 JSON 快照。
  */
-import type { ArticleRow } from "./article.js";
-import type { Post } from "./content.js";
+import type { ArticleRow } from "../article/article.js";
+import type { Post } from "../content/content.js";
 
 /** 单条命中文章（列表级元数据，不抓正文） */
 export interface SearchResult {

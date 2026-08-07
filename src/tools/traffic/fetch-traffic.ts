@@ -1,10 +1,10 @@
 import type { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
-import { requireLogin } from "../auth/auth.js";
-import { fetchTraffic, fetchAllTraffic } from "../crawl/traffic/index.js";
-import type { TrafficTreeNode } from "../models/index.js";
-import { DEFAULT_CONCURRENCY, MAX_CONCURRENCY } from "../core/config.js";
-import { registerLoggedTool } from "./with-logging.js";
+import { requireLogin } from "../../auth/auth.js";
+import { fetchTraffic, fetchAllTraffic } from "../../crawl/traffic/index.js";
+import type { TrafficTreeNode } from "../../models/index.js";
+import { DEFAULT_CONCURRENCY, MAX_CONCURRENCY } from "../../core/config.js";
+import { registerLoggedTool } from "../with-logging.js";
 
 /** 格式化单条流量统计 */
 function formatTraffic(t: {
