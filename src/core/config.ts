@@ -7,7 +7,7 @@ import { load as yamlLoad } from "js-yaml";
 // .env 凭证（仅账号密码）
 // ============================================================
 
-dotenv.config();
+dotenv.config({ quiet: true });
 
 export const secrets = {
   userId: process.env.USER_ID || "",
@@ -180,6 +180,23 @@ export const http = loadYaml<HttpConfig>("rules/http.yaml");
 export const DEFAULT_CONCURRENCY = http.concurrency.default;
 /** 并发度上限（工具参数 zod 校验用） */
 export const MAX_CONCURRENCY = http.concurrency.max;
+
+// ============================================================
+// 3. 通用规则 — 日志
+// ============================================================
+
+export interface LogConfig {
+  /** 日志文件路径（相对项目根） */
+  file: string;
+  /** 级别过滤：debug < info < warn < error */
+  level: string;
+  /** 是否同时在 stderr 输出人类可读多行摘要 */
+  to_stderr?: boolean;
+  /** 命名空间过滤（glob，如 crawler.*）；空数组 = 记录全部 */
+  include_ns?: string[];
+}
+
+export const logConfig = loadYaml<LogConfig>("rules/log.yaml");
 
 // ============================================================
 // 便捷工具：路由变量替换

@@ -4,6 +4,7 @@ import { requireLogin } from "../auth/auth.js";
 import { fetchTraffic, fetchAllTraffic } from "../crawl/traffic/index.js";
 import type { TrafficTreeNode } from "../models/index.js";
 import { DEFAULT_CONCURRENCY, MAX_CONCURRENCY } from "../core/config.js";
+import { registerLoggedTool } from "./with-logging.js";
 
 /** 格式化单条流量统计 */
 function formatTraffic(t: {
@@ -43,7 +44,8 @@ function formatTree(
 
 /** 注册获取流量信息工具 */
 export function registerFetchTrafficTool(server: McpServer): void {
-  server.registerTool(
+  registerLoggedTool(
+    server,
     "forum-fetch-traffic",
     {
       title: "流量 · 获取版面/分区流量",

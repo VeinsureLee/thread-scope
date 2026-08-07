@@ -4,6 +4,7 @@ import { requireLogin } from "../auth/auth.js";
 import { searchThreads } from "../init/search.js";
 import { ContentDb } from "../storage/content-db.js";
 import { selectors, DEFAULT_CONCURRENCY, MAX_CONCURRENCY } from "../core/config.js";
+import { registerLoggedTool } from "./with-logging.js";
 
 /**
  * 注册搜索帖子工具（docs/03 §2.2 — forum-search-threads）。
@@ -14,7 +15,8 @@ import { selectors, DEFAULT_CONCURRENCY, MAX_CONCURRENCY } from "../core/config.
  * - 可选落库：将命中文章与正文写入 forum-content.db。
  */
 export function registerSearchThreadsTool(server: McpServer): void {
-  server.registerTool(
+  registerLoggedTool(
+    server,
     "forum-search-threads",
     {
       title: "搜索 · 搜索帖子并抓取正文",

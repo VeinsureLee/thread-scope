@@ -1,5 +1,6 @@
 import type { TrafficInfo } from "../models/index.js";
 import { TrafficDb } from "./traffic-db.js";
+import { logError } from "../logging/logger.js";
 
 /**
  * 后台任务队列：将写库等副作用任务排队异步执行，不阻塞 MCP 工具返回。
@@ -57,7 +58,10 @@ export class TaskQueue {
 
 /** 全局唯一的写库队列 */
 export const trafficQueue = new TaskQueue((err) => {
-  console.error("[traffic-queue] 写库任务失败:", err);
+  logError("queue", {
+    message: "写库任务失败",
+    error: err instanceof Error ? err.message : String(err),
+  }, "storage.queue");
 });
 
 /** 便捷：将一批流量采样入队写库 */

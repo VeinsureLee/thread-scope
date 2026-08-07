@@ -1,0 +1,30 @@
+# ============================================================
+# 通用规则 — 日志配置
+# ============================================================
+# 日志写文件（JSONL，每行一条 JSON 记录），追加模式，不轮转。
+# 同时可选输出 stderr 人类可读摘要（to_stderr: true）。
+# MCP 走 stdio，stdout 是协议通道，日志绝不写 stdout。
+# ============================================================
+
+# ── 日志文件路径（相对项目根） ──
+# .log/ 已被 .gitignore 忽略，日志与运行数据同区，不泄露、不入库。
+file: ".log/forum-mcp.log"
+
+# ── 级别过滤：debug < info < warn < error ──
+# 低于此级别的日志不写。info = 工具调用记录 + 常规事件；warn/error 只记问题。
+level: "info"
+
+# ── stderr 实时输出（人类可读多行） ──
+# 文件里仍是 JSONL（机器可读）；此项开启时同时在 stderr 打一份可读摘要。
+# 适合终端直接看 / 调试面板实时观察。
+to_stderr: true
+
+# ── 命名空间分层过滤（logger 名） ──
+# 每条日志带 namespace 字段（如 crawler.board、mcp.search）。
+# include_ns 列出要记录的 namespace（支持 glob：crawler.* 匹配 crawler.board 等）；
+# 留空/省略 = 记录全部。
+# 过滤示例：
+#   include_ns: ["crawler.*"]       # 只看爬取
+#   include_ns: ["mcp.*"]           # 只看工具调用
+#   include_ns: ["crawler.*", "error"]  # 爬取 + 所有错误（error 级别总是记录）
+include_ns: []

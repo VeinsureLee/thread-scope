@@ -4,6 +4,7 @@ import { requireLogin } from "../auth/auth.js";
 import { fetchBoardArticles } from "../crawl/article/index.js";
 import { ContentDb } from "../storage/content-db.js";
 import { selectors } from "../core/config.js";
+import { registerLoggedTool } from "./with-logging.js";
 
 /**
  * 注册获取版块文章列表工具。
@@ -13,7 +14,8 @@ import { selectors } from "../core/config.js";
  * - 落库到 forum-content.db 的 article 表（需先保证 board 存在，满足外键）
  */
 export function registerFetchArticlesTool(server: McpServer): void {
-  server.registerTool(
+  registerLoggedTool(
+    server,
     "forum-fetch-board-articles",
     {
       title: "文章 · 获取版块文章列表",

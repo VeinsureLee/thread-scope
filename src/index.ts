@@ -1,6 +1,8 @@
 import { McpServer } from "@modelcontextprotocol/server";
 import { StdioServerTransport } from "@modelcontextprotocol/server/stdio";
 import { flushTrafficWrites } from "./storage/traffic-queue.js";
+import { logInfo, logError, logFilePath } from "./logging/logger.js";
+import { attachValidationProbe } from "./logging/validation-probe.js";
 
 // ── 工具注册 ──
 import { registerLoginTool } from "./tools/login-tool.js";
@@ -30,13 +32,22 @@ registerSearchThreadsTool(server);
 
 // ── 启动 ──
 async function main(): Promise<void> {
+  // 传输层入参校验探测：捕获 SDK 校验失败（缺参数等）→ 记日志
+  attachValidationProbe();
+
   const transport = new StdioServerTransport();
   await server.connect(transport);
-  console.error("forum-mcp server started");
+  logInfo("system", {
+    message: "forum-mcp server started",
+    logFile: logFilePath(),
+  }, "system");
 }
 
 main().catch((error: unknown) => {
-  console.error("Failed to start forum-mcp:", error);
+  logError("system", {
+    message: "Failed to start forum-mcp",
+    error: error instanceof Error ? error.message : String(error),
+  }, "system");
   process.exit(1);
 });
 

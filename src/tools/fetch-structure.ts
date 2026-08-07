@@ -5,13 +5,15 @@ import {
   fetchForumTree,
   fetchNodeChildren,
 } from "../crawl/structure/index.js";
+import { registerLoggedTool } from "./with-logging.js";
 
 /**
  * 注册论坛结构爬取工具。
  * 不传参数时返回完整树状结构；传 parentId 时仅返回该节点下的子节点。
  */
 export function registerFetchStructureTool(server: McpServer): void {
-  server.registerTool(
+  registerLoggedTool(
+    server,
     "forum-fetch-structure",
     {
       title: "结构 · 获取论坛结构",

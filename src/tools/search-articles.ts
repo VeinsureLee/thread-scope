@@ -5,6 +5,7 @@ import { resolveScope, searchBoards } from "../crawl/search/index.js";
 import { fetchForumTree } from "../crawl/structure/index.js";
 import { ContentDb } from "../storage/content-db.js";
 import { selectors, DEFAULT_CONCURRENCY, MAX_CONCURRENCY } from "../core/config.js";
+import { registerLoggedTool } from "./with-logging.js";
 
 /**
  * 注册版面内搜索工具（docs/03 §2.2 — forum-search-articles）。
@@ -19,7 +20,8 @@ import { selectors, DEFAULT_CONCURRENCY, MAX_CONCURRENCY } from "../core/config.
  *   persist=false 可只查不写）。
  */
 export function registerSearchArticlesTool(server: McpServer): void {
-  server.registerTool(
+  registerLoggedTool(
+    server,
     "forum-search-articles",
     {
       title: "搜索 · 搜索文章",

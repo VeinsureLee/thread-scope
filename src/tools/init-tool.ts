@@ -1,10 +1,12 @@
 import type { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
 import { initForum } from "../init/init.js";
+import { registerLoggedTool } from "./with-logging.js";
 
 /** 注册论坛初始化工具 */
 export function registerInitTool(server: McpServer): void {
-  server.registerTool(
+  registerLoggedTool(
+    server,
     "forum-init",
     {
       title: "初始化 · 一键初始化论坛数据",

@@ -4,6 +4,7 @@ import type { ForumTreeNode, SearchResult } from "../../models/index.js";
 import { paginate, parsePagination } from "../common/paginator.js";
 import { mapWithConcurrency, poolValues } from "../common/async-pool.js";
 import { DEFAULT_CONCURRENCY } from "../../core/config.js";
+import { logWarn } from "../../logging/logger.js";
 import { fetchForumTree } from "../structure/index.js";
 import { TrafficDb } from "../../storage/traffic-db.js";
 import { SearchRepository, HttpSearchRepository } from "./repository.js";
@@ -85,7 +86,7 @@ export async function searchBoards(
     .filter((r) => r.error !== undefined)
     .map((r) => `版面 [${boardEnames[r.index]!}] 搜索失败: ${String(r.error)}`);
   if (errors.length > 0) {
-    console.error("[search] 部分版面搜索失败:\n  " + errors.join("\n  "));
+    logWarn("crawl", { message: "部分版面搜索失败", boards: errors }, "crawler.search");
   }
 
   return poolValues(results).flat();
