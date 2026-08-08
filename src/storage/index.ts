@@ -11,3 +11,4 @@ export { TrafficDb } from "./traffic-db.js";
 export { enqueueTrafficWrite, flushTrafficWrites } from "./traffic-queue.js";
 export { readJson, writeJson, getDataDir } from "./structure-store.js";
 export { openDb, transaction } from "./db-common.js";
+export { flattenArticleNodes } from "./mapper/index.js";

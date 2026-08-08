@@ -84,6 +84,9 @@ function parseFloor(
   // ── 时间 ──
   const postTime = parsePostTime(content);
 
+  // ── L1 内嵌作者资料（docs/06 §2.3） ──
+  const embedded = parseEmbeddedAuthor($, $wrap);
+
   return {
     floor,
     kind: floor === 1 ? "article" : "reply",
@@ -94,6 +97,67 @@ function parseFloor(
     images,
     postTime,
     posText,
+    authorNick: embedded.nick,
+    authorGender: embedded.gender,
+    authorLevel: embedded.level,
+    authorPosts: embedded.posts,
+    authorScore: embedded.score,
+    authorAstro: embedded.astro,
+  };
+}
+
+/**
+ * 提取楼层内嵌作者资料（L1，docs/06 §2.3，0 额外请求）。
+ *
+ * 结构（2026-08-07 在线验证，位于 .a-body 行内的 td.a-left）：
+ *   td.a-left（.a-body 内）：
+ *     .a-u-uid                     → 昵称
+ *     .a-u-sex samp[title]         → 性别（"男生哦 离线" → 男生）
+ *     dl.a-u-info > dt/dd 键值对   → 等级/文章/积分/星座
+ *
+ * 注意：楼层有两处 td.a-left（a-head 行 与 a-body 行），资料在 a-body 行，
+ * 故限定 $wrap.find("tr.a-body td.a-left")。
+ *
+ * @returns 6 个 L1 字段（nick/gender/level/posts/score/astro），缺省空串
+ */
+function parseEmbeddedAuthor(
+  $: CheerioAPI,
+  $wrap: ReturnType<CheerioAPI>,
+): { nick: string; gender: string; level: string; posts: string; score: string; astro: string } {
+  // 资料块（a-body 行）：昵称 + dl.a-u-info
+  const $bodyLeft = $wrap.find("tr.a-body td.a-left").first();
+
+  // 昵称
+  const nick = $bodyLeft.find("div.a-u-uid").first().text().trim();
+
+  // 性别：.a-u-sex 位于 a-head 行 td.a-left（非 a-body 行）
+  // title 形如 "男生哦 离线" / "女生哦 在线" / "性别保密哦 离线" → 取前缀
+  const $headSex = $wrap.find("tr.a-head .a-u-sex samp").first();
+  const sexTitle = ($headSex.attr("title") || "").trim();
+  const gender = sexTitle.startsWith("男生")
+    ? "男生"
+    : sexTitle.startsWith("女生")
+      ? "女生"
+      : "";
+
+  // dl.a-u-info 的 dt→dd 键值对（a-body 行）
+  const map: Record<string, string> = {};
+  $bodyLeft.find("dl.a-u-info").each((_, dl) => {
+    const $dl = $(dl);
+    $dl.children("dt").each((i, dt) => {
+      const key = $(dt).text().trim();
+      const value = $dl.children("dd").eq(i).text().trim();
+      if (key) map[key] = value;
+    });
+  });
+
+  return {
+    nick,
+    gender,
+    level: map["等级"] ?? "",
+    posts: map["文章"] ?? "",
+    score: map["积分"] ?? "",
+    astro: map["星座"] ?? "",
   };
 }
 

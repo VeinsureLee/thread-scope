@@ -29,6 +29,18 @@ export interface Post {
   postTime: string | null;
   /** 楼层位置文本（楼主/沙发/板凳/第N楼，可空） */
   posText: string;
+  /** 作者昵称（L1 内嵌资料，详情页 .a-u-uid；可空） */
+  authorNick?: string;
+  /** 作者性别（L1 内嵌资料，详情页 .a-u-sex title；可空） */
+  authorGender?: string;
+  /** 作者等级（L1 内嵌资料，dl.a-u-info dt=等级 dd；可空） */
+  authorLevel?: string;
+  /** 作者文章数（L1 内嵌资料，dt=文章 dd；可空） */
+  authorPosts?: string;
+  /** 作者积分（L1 内嵌资料，dt=积分 dd；可空） */
+  authorScore?: string;
+  /** 作者星座（L1 内嵌资料，dt=星座 dd；可空） */
+  authorAstro?: string;
 }
 
 /** 一篇文章的完整内容（首帖 + 全部评论） */

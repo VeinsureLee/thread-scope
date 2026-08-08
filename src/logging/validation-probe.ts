@@ -1,5 +1,5 @@
 import { logError } from "../logging/logger.js";
-import { getToolSchema } from "../tools/with-logging.js";
+import { getToolSchema } from "../controller/tool/with-logging.js";
 
 /**
  * 传输层入参校验探测（解决 MCP SDK 校验失败日志捕获不到的问题）。

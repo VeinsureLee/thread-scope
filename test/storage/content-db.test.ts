@@ -3,6 +3,7 @@ import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
 import { ContentDb } from "../../src/storage/content-db.js";
+import { ArticleNode, Thread } from "../../src/model/index.js";
 
 describe("storage — ContentDb", () => {
   let tmpFile: string;
@@ -31,6 +32,85 @@ describe("storage — ContentDb", () => {
     expect(id1).toBeGreaterThan(0);
   });
 
+  it("upsertUserProfile：覆盖写入 profile + fetched_at", () => {
+    db.upsertUser({ uid: "user_a", name: "user_a" });
+    db.upsertUserProfile("user_a", { nickname: "测试", level: "用户" }, "2026-08-07T00:00:00Z");
+
+    const profile = db.getUserProfile("user_a") as { nickname: string; level: string };
+    expect(profile.nickname).toBe("测试");
+    expect(profile.level).toBe("用户");
+    expect(db.getUserProfileFetchedAt("user_a")).toBe("2026-08-07T00:00:00Z");
+
+    // 覆盖更新（等级变化）
+    db.upsertUserProfile("user_a", { nickname: "测试", level: "版主" });
+    expect((db.getUserProfile("user_a") as { level: string }).level).toBe("版主");
+  });
+
+  it("getUserProfileFetchedAt：无资料 → null", () => {
+    db.upsertUser({ uid: "user_a", name: "user_a" });
+    expect(db.getUserProfileFetchedAt("user_a")).toBeNull();
+  });
+
+  it("getAllUserUids：列出全部 uid", () => {
+    db.upsertUser({ uid: "user_b", name: "user_b" });
+    db.upsertUser({ uid: "user_a", name: "user_a" });
+    expect(db.getAllUserUids()).toEqual(["user_a", "user_b"]);
+  });
+
+  it("setUserManager / isManager：标记版主（幂等）", () => {
+    db.upsertUser({ uid: "user_a", name: "user_a" });
+    expect(db.isManager("user_a")).toBe(false); // 初始非版主
+    db.setUserManager("user_a");
+    db.setUserManager("user_a"); // 幂等
+    expect(db.isManager("user_a")).toBe(true);
+  });
+
+  it("getAllUserUidsWithFetchedAt：含 profile_fetched_at", () => {
+    db.upsertUser({ uid: "user_a", name: "user_a" });
+    db.upsertUserProfile("user_a", { nickname: "测试" }, "2026-08-07T00:00:00Z");
+    db.upsertUser({ uid: "user_b", name: "user_b" }); // 无 profile
+
+    const all = db.getAllUserUidsWithFetchedAt();
+    const a = all.find((x) => x.uid === "user_a")!;
+    const b = all.find((x) => x.uid === "user_b")!;
+    expect(a.profileFetchedAt).toBe("2026-08-07T00:00:00Z");
+    expect(b.profileFetchedAt).toBeNull();
+  });
+
+  it("getUserThreads：用户 ↔ 帖子/评论 关联", () => {
+    db.upsertBoard("Demo", "示例版", false);
+    db.saveThread(
+      "Demo",
+      { url: "/article/Demo/5001", title: "用户a的帖子" },
+      [{ uid: "user_a", name: "user_a" }, { uid: "user_b", name: "user_b" }],
+      {
+        floor: 1, kind: "article", authorUid: "user_a", authorRaw: "user_a",
+        isAnon: false, content: "user_a 发的正文", images: [], postTime: "2026-08-01T10:00:00", posText: "楼主",
+      },
+      [
+        {
+          floor: 2, kind: "reply", authorUid: "user_a", authorRaw: "user_a",
+          isAnon: false, content: "user_a 的评论", images: [], postTime: "2026-08-02T10:00:00", posText: "沙发",
+        },
+        {
+          floor: 3, kind: "reply", authorUid: "user_b", authorRaw: "user_b",
+          isAnon: false, content: "user_b 的评论", images: [], postTime: "2026-08-03T10:00:00", posText: "板凳",
+        },
+      ],
+    );
+
+    const threads = db.getUserThreads("user_a");
+    expect(threads).toHaveLength(2); // 首帖 + 评论
+    expect(threads[0]!.articleTitle).toBe("用户a的帖子");
+    expect(threads.map((t) => t.kind).sort()).toEqual(["article", "reply"]);
+
+    // user_b 只 1 条
+    expect(db.getUserThreads("user_b")).toHaveLength(1);
+
+    // 不存在的用户 → 空
+    expect(db.getUserThreads("_nobody_")).toEqual([]);
+  });
+
   it("upsertArticle + findArticleIdByUrl 判重", () => {
     db.upsertBoard("Demo", "示例版", false);
     const row = {
@@ -48,6 +128,10 @@ describe("storage — ContentDb", () => {
     const id = db.upsertArticle(row);
     expect(id).toBeGreaterThan(0);
     expect(db.findArticleIdByUrl("/article/Demo/1001")).toBe(id);
+    const cached = db.searchArticles("示例")[0]!;
+    expect(cached.date).toBe("2026-08-01");
+    expect(cached.replyCount).toBe(1);
+    expect(cached.lastReply).toBe("2026-08-02");
     // 重复插入 → 更新而非新增（返回同一 id）
     expect(db.upsertArticle({ ...row, title: "示例帖2" })).toBe(id);
   });
@@ -93,6 +177,61 @@ describe("storage — ContentDb", () => {
     db.saveThread("Demo", meta, [], post, []);
     db.saveThread("Demo", meta, [], post, []);
     expect(db.getThreadPosts(db.findArticleIdByUrl(meta.url)!)).toHaveLength(1);
+  });
+
+  it("saveThreadModel：持久化 Thread 概览、ArticleNode 树与 parent_id", () => {
+    const root = new ArticleNode({
+      id: "thread-1",
+      kind: "article",
+      title: "示例主题",
+      content: "首帖内容",
+      author: { uid: "user_a", displayName: "user_a" },
+      authorRaw: "user_a",
+      isAnonymous: false,
+      forumFloor: 1,
+    });
+    const reply = new ArticleNode({
+      id: "thread-2",
+      kind: "reply",
+      content: "回复内容",
+      author: { uid: "user_b", displayName: "user_b" },
+      authorRaw: "user_b",
+      isAnonymous: false,
+      forumFloor: 2,
+    });
+    root.addReply(reply);
+    const nestedReply = new ArticleNode({
+      id: "thread-3",
+      kind: "reply",
+      content: "绗簩灞傚洖澶嶅唴瀹?",
+      author: { uid: "user_c", displayName: "user_c" },
+      authorRaw: "user_c",
+      isAnonymous: false,
+      forumFloor: 3,
+    });
+    reply.addReply(nestedReply);
+    const thread = Thread.create({
+      boardEname: "Demo",
+      articleId: "1002",
+      title: "示例主题",
+      url: "/article/Demo/1002",
+      author: { uid: "user_a", displayName: "user_a" },
+      authorRaw: "user_a",
+      date: "2026-01-01",
+      isPinned: true,
+      replyCount: 2,
+      lastReplyAt: "2026-01-02",
+      lastReplier: { uid: "user_b", displayName: "user_b" },
+      urlHash: "hash-1002",
+    });
+    thread.replaceContent(root, "complete");
+
+    db.saveThreadModel(thread);
+    const articleId = db.findArticleIdByUrl(thread.overview.url);
+    expect(articleId).not.toBeNull();
+    const posts = db.getThreadPosts(articleId!);
+    expect(posts).toHaveLength(3);
+    expect(posts.find((post) => post.floor === 3)?.parentId).toBe(2);
   });
 
   it("searchArticles：本地搜索文章（标题 LIKE）", () => {

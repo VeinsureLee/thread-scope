@@ -1,3 +1,5 @@
+import { defaultTaskExecutor } from "../../application/execution/async-task-executor.js";
+
 /**
  * 异步并发工具：带并发上限的映射（工作池）。
  *
@@ -38,28 +40,18 @@ export async function mapWithConcurrency<T, R>(
     throw new Error(`并发度 limit 必须 >= 1，收到 ${limit}`);
   }
 
-  const results: Array<PoolResult<R> & { index: number }> = [];
-  let cursor = 0;
-
-  // 每个"槽位"顺序领取下一个任务；槽位数 = min(limit, items.length)
-  const slots = Math.min(limit, items.length);
-  const workers = Array.from({ length: slots }, async () => {
-    while (true) {
-      const index = cursor++;
-      if (index >= items.length) break;
-
-      const item = items[index]!;
-      try {
-        const value = await fn(item, index);
-        results.push({ index, value });
-      } catch (err) {
-        results.push({ index, error: err instanceof Error ? err : new Error(String(err)) });
-      }
-    }
+  const outcomes = await defaultTaskExecutor.map(
+    items,
+    { concurrency: limit, failureMode: "isolate" },
+    fn,
+  );
+  return outcomes.map((outcome) => {
+    if (outcome.status === "success") return { index: outcome.index, value: outcome.value };
+    return {
+      index: outcome.index,
+      error: new Error(outcome.error?.message ?? `任务${outcome.status}`),
+    };
   });
-
-  await Promise.all(workers);
-  return results.sort((a, b) => a.index - b.index);
 }
 
 /**

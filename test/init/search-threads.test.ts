@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { searchThreads } from "../../src/init/search.js";
+import { searchThreads } from "../../src/application/use-case/search/search-threads.js";
 import type { SearchRepository } from "../../src/crawl/search/repository.js";
 import type { ThreadRepository } from "../../src/crawl/content/repository.js";
 import type { ForumTreeNode } from "../../src/models/index.js";

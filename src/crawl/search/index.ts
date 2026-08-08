@@ -1,14 +1,8 @@
 /**
  * crawl/search 统一出口（docs/01 §2.1 — 同构四件套）。
- * 工具层只走 index.ts，不直接 import 内部文件。
+ * 只导出单 board 搜索读取；跨 board 并发编排在 application/use-case/search。
  */
-export {
-  searchBoardArticles,
-  searchBoards,
-  searchAllBoards,
-  resolveScope,
-  type SearchScope,
-} from "./service.js";
+export { searchBoardArticles } from "./service.js";
 export type { SearchRepository, HttpSearchRepository } from "./repository.js";
 export {
   parseSearchResults,

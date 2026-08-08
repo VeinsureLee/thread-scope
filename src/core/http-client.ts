@@ -62,3 +62,30 @@ export async function ajaxGet(path: string): Promise<string> {
   saveCookie(resp);
   return decodeBody(resp);
 }
+
+/**
+ * 发起论坛 AJAX POST 请求（表单 body，带 X-Requested-With 头和 Cookie）。
+ *
+ * 用途（docs/06 §2.4）：特殊头衔接口 `/user/ajax_tquery.json` 为 POST，
+ * body 为 `list[]=uid1&list[]=uid2`（jQuery 数组序列化）。与 ajaxGet 对称，
+ * 同样走编码解码 + Cookie 管理 + 限速队列（调用方经 PageFetcher）。
+ */
+export async function ajaxPost(path: string, body: string): Promise<string> {
+  const separator = path.includes("?") ? "&" : "?";
+  const url = `${forum.base_url}${path}${separator}_uid=${secrets.userId}`;
+
+  const resp = await axios.post(url, body, {
+    headers: {
+      ...http.headers,
+      ...http.ajax_headers,
+      "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+      Referer: `${forum.base_url}${forum.default_path}`,
+      Cookie: globalCookie,
+    },
+    responseType: "arraybuffer",
+    timeout: http.timeout_ms,
+    validateStatus: () => true,
+  });
+  saveCookie(resp);
+  return decodeBody(resp);
+}

@@ -5,6 +5,7 @@
  */
 import type { ArticleRow } from "../article/article.js";
 import type { Post } from "../content/content.js";
+import type { Thread } from "../../model/thread/thread.js";
 
 /** 单条命中文章（列表级元数据，不抓正文） */
 export interface SearchResult {
@@ -24,4 +25,6 @@ export interface SearchThreadHit {
   firstPost: Post;
   /** 全文评论（跨页翻页后的全部楼层） */
   replies: Post[];
+  /** 新领域 Thread；firstPost/replies 暂时保留，供旧工具与持久化兼容。 */
+  thread?: Thread;
 }

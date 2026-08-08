@@ -10,7 +10,7 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { login, logout } from "../../src/auth/auth.js";
 import { fetchForumTree } from "../../src/crawl/structure/index.js";
-import { fetchTraffic } from "../../src/crawl/traffic/index.js";
+import { fetchTrafficUseCase } from "../../src/application/use-case/traffic/fetch-traffic-impl.js";
 import type { ForumTreeNode, BoardNode } from "../../src/models/index.js";
 
 const liveEnabled = process.env.BYR_LIVE === "1";
@@ -51,7 +51,7 @@ describe.skipIf(!liveEnabled)("live: 真实论坛集成测试（BYR_LIVE=1 时�
 
     // 动态选取，不硬编码论坛内部标识
     const leaf = boards[0]!;
-    const snapshot = await fetchTraffic(leaf.id, {});
+    const snapshot = await fetchTrafficUseCase(leaf.id, {});
     expect(snapshot.records.length).toBeGreaterThan(0);
 
     const r = snapshot.records[0]!;

@@ -34,3 +34,9 @@ concurrency:
   default: 8
   # 允许用户设置的最大并发度（工具参数 zod 上限）
   max: 16
+
+# ── 用户资料（docs/06） ──
+user:
+  # 用户资料 TTL（小时）：批量抓取时，profile_fetched_at 距今 < TTL 的用户跳过（不重抓）。
+  # 等级/积分等会变，TTL 到期后重抓覆盖更新；force=true 可强制重抓。
+  profile_ttl_hours: 72

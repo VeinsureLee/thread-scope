@@ -1,4 +1,3 @@
-import { load } from "cheerio";
 import type { User, UserProfile } from "../../models/index.js";
 import { selectors } from "../../core/config.js";
 import { uidFromHref, isAnonLink } from "../common/parser-kit.js";
@@ -30,53 +29,116 @@ export function parseAuthor(
   return { uid, name: trimmed, isAnon: false };
 }
 
+// ============================================================
+// 用户资料解析（docs/06 §2.2 / §2.4）
+//
+// 数据源：
+// - query.json  `/user/query/{uid}.json`（GET，单 uid，需登录）→ 主体字段
+// - tquery      `/user/ajax_tquery.json`（POST list[]=uid，批量，需登录）→ 特殊头衔
+// 旧版解析弹窗 HTML（section.u-query）的方式已废弃——该弹窗内容实际由 query.json
+// 渲染，且直接 GET `/user/query/{uid}` 返回模板错误，故改为解析 JSON。
+// ============================================================
+
+/** query.json 原始响应（可空字段已标注） */
+interface QueryJson {
+  id: string;
+  user_name?: string;
+  face_url?: string;
+  gender?: string; // "m" | "f"
+  astro?: string;
+  qq?: string;
+  msn?: string;
+  home_page?: string;
+  level?: string;
+  post_count?: number;
+  score?: number;
+  life?: number;
+  last_login_time?: number; // unix 秒
+  last_login_ip?: string;
+  is_online?: boolean;
+  follow_num?: number;
+  fans_num?: number;
+  status?: string;
+  ajax_st: number;
+}
+
+/** tquery 原始响应（头衔批量） */
+interface TQueryJson {
+  data: Array<{ uid: string; path: Array<{ name?: string }> }> | false;
+}
+
 /**
- * 从用户资料弹窗 HTML（/user/query/{uid}，element-05）解析用户资料。
+ * 从 query.json 原始 JSON 解析用户资料（主体字段，不含特殊头衔）。
  *
- * @param uid 用户 ID（如 "user_a"）
- * @param html 弹窗 HTML（含 section.u-query）
+ * 特殊头衔（title）由 tquery 提供，经 parseUserTitles 合并；本函数产出其余字段。
+ *
+ * @param uid  用户 ID
+ * @param raw  query.json 原始响应字符串（GBK 已由 ajaxGet 解码）
+ * @returns 解析后的 UserProfile（title 为空数组，fetchedAt 当前时间）
  */
-export function parseUserProfile(uid: string, html: string): UserProfile {
-  const $ = load(html);
-  const $section = $(selectors.user_profile.wrap);
-  if ($section.length === 0) {
-    throw new Error(`用户资料解析失败: section.u-query 未找到 (uid=${uid})`);
+export function parseUserProfile(uid: string, raw: string): UserProfile {
+  const json = JSON.parse(raw) as QueryJson;
+  if (json.ajax_st !== 1) {
+    throw new Error(`用户资料接口返回失败 (uid=${uid}, ajax_st=${json.ajax_st})`);
   }
 
-  // 提取 dl 内的 dt→dd 键值对
-  const dlMap = (dlSel: string): Record<string, string> => {
-    const map: Record<string, string> = {};
-    $section.find(dlSel).each((_, dl) => {
-      const $dl = $(dl);
-      $dl.children("dt").each((i, dt) => {
-        const key = $(dt).text().replace(/[：:]/g, "").trim();
-        const value = $dl.children("dd").eq(i).text().trim();
-        if (key) map[key] = value;
-      });
-    });
-    return map;
-  };
-
-  const base = dlMap("article.u-info dl");
-  const detail = dlMap("article.u-detail dl");
+  const now = new Date().toISOString();
+  const postCount = typeof json.post_count === "number" ? `${json.post_count}篇` : "";
+  const lastLogin = typeof json.last_login_time === "number"
+    ? new Date(json.last_login_time * 1000).toISOString()
+    : "";
 
   return {
     uid,
-    nickname: base["昵 称"] ?? base["昵称"] ?? "",
-    gender: base["性 别"] ?? "",
-    constellation: base["星 座"] ?? "",
-    qq: base["QQ"] ?? "",
-    msn: base["MSN"] ?? "",
-    homepage: base["主 页"] ?? "",
-    level: detail["论坛等级"] ?? "",
-    title: detail["特殊头衔"] ?? "",
-    postCount: detail["帖子总数"] ?? "",
-    points: detail["积分"] ?? "",
-    vitality: detail["生命力"] ?? "",
-    lastLogin: detail["上次登录"] ?? "",
-    lastIp: detail["最后访问IP"] ?? "",
-    onlineStatus: detail["当前状态"] ?? "",
+    nickname: json.user_name ?? "",
+    gender: genderText(json.gender),
+    constellation: json.astro ?? "",
+    qq: json.qq ?? "",
+    msn: json.msn ?? "",
+    homepage: json.home_page ?? "",
+    avatar: json.face_url ?? "",
+    level: json.level ?? "",
+    title: [],
+    postCount,
+    points: typeof json.score === "number" ? String(json.score) : "",
+    vitality: typeof json.life === "number" ? String(json.life) : "",
+    lastLogin,
+    lastIp: json.last_login_ip ?? "",
+    onlineStatus: json.status ?? "",
+    isOnline: json.is_online ?? false,
+    followNum: json.follow_num ?? 0,
+    fansNum: json.fans_num ?? 0,
+    fetchedAt: now,
   };
+}
+
+/**
+ * 从 tquery 原始 JSON 提取特殊头衔名列表（可多个）。
+ *
+ * @param uid 用户 ID
+ * @param raw tquery 原始响应字符串
+ * @returns 头衔名数组；无头衔用户（data:false 或不在 data 里）返回空数组
+ */
+export function parseUserTitles(uid: string, raw: string): string[] {
+  const json = JSON.parse(raw) as TQueryJson;
+  if (!json.data) return [];
+  const entry = json.data.find((d) => d.uid === uid);
+  if (!entry) return [];
+  return entry.path
+    .map((p) => p.name ?? "")
+    .filter((n) => n.length > 0);
+}
+
+/** 合并 query.json 主体资料 + tquery 特殊头衔 → 完整 UserProfile */
+export function mergeTitles(profile: UserProfile, titles: string[]): UserProfile {
+  return { ...profile, title: titles };
+}
+
+/** gender 编码 → 中文（m/f → 男生/女生；未知空） */
+function genderText(g: string | undefined): string {
+  if (g === "m") return "男生";
+  if (g === "f") return "女生";
+  return "";
 }
 
 /**
@@ -88,8 +150,13 @@ export function profileToUser(profile: UserProfile): User {
     uid: profile.uid,
     name: profile.nickname || profile.uid,
     isAnon: false,
-    avatar: null,
+    avatar: profile.avatar || null,
     profile,
     updatedAt: new Date().toISOString(),
   };
+}
+
+/** 供测试/其他模块判断 uid 是否为匿名占位名（IWhisper#数字）。用 name_regex（纯名匹配），非链接 uid_regex。 */
+export function isAnonUid(uid: string): boolean {
+  return new RegExp(selectors.anonymous.name_regex).test(uid);
 }

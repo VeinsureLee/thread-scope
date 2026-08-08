@@ -30,11 +30,15 @@ export class HttpSearchRepository implements SearchRepository {
     // 手动拼接：encodeURIComponent 中文→UTF-8 百分号编码、空格→%20，
     // 与浏览器表单提交一致（URLSearchParams 会把空格编码为 +，论坛不认）。
     //
-    // 关键：au 参数【必须存在】（即使为空）。实测（2026-08-07）BYR 的 /s/article
+    // 关键 1：au 参数【必须存在】（即使为空）。实测（2026-08-07）BYR 的 /s/article
     // 缺 au 时返回"没有搜索到任何主题"（0 结果），带空 au= 才能命中。
+    //
+    // 关键 2：按作者搜索【可不传关键字】。实测（2026-08-07）`?b={board}&au={uid}`
+    // （无 t1）正常返回该作者帖子；仅 au 无 b 报错。故有 author 且无 keyword 时省略 t1。
     const params: string[] = [];
     if (opts.boardEname) params.push(`b=${encodeURIComponent(opts.boardEname)}`);
-    params.push(`t1=${encodeURIComponent(opts.keyword)}`);
+    // 有关键字才拼 t1；按作者搜索（author 无 keyword）省略
+    if (opts.keyword) params.push(`t1=${encodeURIComponent(opts.keyword)}`);
     params.push(`au=${opts.author ? encodeURIComponent(opts.author) : ""}`);
     return `${selectors.search.path}?${params.join("&")}`;
   }

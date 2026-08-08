@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { searchBoardArticles, searchBoards } from "../../src/crawl/search/service.js";
+import { searchBoardArticles } from "../../src/crawl/search/service.js";
+import { searchBoards } from "../../src/application/use-case/search/search-boards.js";
 import type { SearchRepository } from "../../src/crawl/search/repository.js";
 
 // TrafficDb 打桩：getLatestAll 返回空 → 默认范围回退到论坛树前 N 版（确定性测试）

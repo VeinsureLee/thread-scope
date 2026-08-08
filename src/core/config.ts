@@ -56,6 +56,8 @@ export interface RoutesConfig {
   thread_detail: string;
   search_path: string;
   user_query: string;
+  user_query_json: string;
+  user_tquery_json: string;
   tree_root_param: string;
   tree_recursive_param: string;
   count_param: string;
@@ -174,6 +176,11 @@ export interface HttpConfig {
     /** 允许用户设置的最大并发度 */
     max: number;
   };
+  /** 用户资料配置（docs/06） */
+  user: {
+    /** 资料 TTL（小时），批量抓取时跳过未过期用户 */
+    profile_ttl_hours: number;
+  };
 }
 
 export const http = loadYaml<HttpConfig>("rules/http.yaml");
@@ -182,6 +189,8 @@ export const http = loadYaml<HttpConfig>("rules/http.yaml");
 export const DEFAULT_CONCURRENCY = http.concurrency.default;
 /** 并发度上限（工具参数 zod 校验用） */
 export const MAX_CONCURRENCY = http.concurrency.max;
+/** 用户资料 TTL（小时，docs/06 §5.3） */
+export const USER_PROFILE_TTL_HOURS = http.user.profile_ttl_hours;
 
 // ============================================================
 // 3. 通用规则 — 日志

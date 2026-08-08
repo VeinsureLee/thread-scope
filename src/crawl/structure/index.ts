@@ -7,6 +7,7 @@ export {
   fetchForumTree,
   fetchNodeChildren,
 } from "./service.js";
+export { STRUCTURE_CACHE_FILE } from "./service.js";
 export type { ForumTreeNode } from "../../models/index.js";
 
 // ============================================================
