@@ -10,7 +10,7 @@ export function registerFetchUserTitlesTool(server: McpServer): void {
     "forum-fetch-user-titles",
     {
       title: "用户 · 抓取特殊头衔",
-      description: "分类: 用户。抓取指定用户的特殊头衔；uids 支持单个字符串或字符串数组。不传 uids 时更新已落库用户的全部头衔。",
+      description: "分类: 用户。抓取指定用户的特殊头衔；uids 支持单个字符串或字符串数组。不传 uids 时更新已落库用户的全部头衔（force 可强制刷新 TTL）。前置: forum-login。返回: uid → 头衔列表。",
       inputSchema: z.object({
         uids: z.union([z.string(), z.array(z.string())]).optional().describe("目标用户 uid：单个字符串（如 \"user_a\"）或字符串数组（如 [\"user_a\",\"user_b\"]）；不传则更新已落库用户的全部头衔"),
         force: z.boolean().default(false).describe("是否忽略 TTL 强制更新全部用户头衔（默认 false；仅全量模式生效）"),

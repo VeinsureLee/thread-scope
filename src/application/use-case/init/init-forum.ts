@@ -8,6 +8,7 @@ export {
 } from "./init-forum-impl.js";
 export type {
   InitResult,
+  InitForumOptions,
   InitStructureResult,
   InitManagersResult,
   InitBoardArticlesResult,

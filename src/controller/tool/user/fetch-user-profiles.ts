@@ -11,7 +11,7 @@ export function registerFetchUserProfilesTool(server: McpServer): void {
     "forum-fetch-user-profiles",
     {
       title: "用户 · 批量抓取用户资料",
-      description: "分类: 用户。批量抓取用户资料并写入 user 表；uids 支持单个字符串或字符串数组（如 \"user_a\" 或 [\"user_a\",\"user_b\"]）。不传 uids 时抓取已落库的全部用户。",
+      description: "分类: 用户。批量抓取用户资料并写入 user 表；uids 支持单个字符串或字符串数组。不传 uids 时抓取已落库的全部用户（TTL 72h 内跳过，force 可强制）。前置: forum-login。关联: 版主可经 forum-init withManagers 批量；其余 uid 可在此批量补全资料。返回: 抓取统计与失败列表。",
       inputSchema: z.object({
         uids: z.union([z.string(), z.array(z.string())]).optional().describe("目标用户 uid：单个字符串（如 \"user_a\"）或字符串数组（如 [\"user_a\",\"user_b\"]）；不传则更新已落库的全部用户"),
         concurrency: z.number().int().positive().max(MAX_CONCURRENCY).default(DEFAULT_CONCURRENCY).describe(`并发度（默认 ${DEFAULT_CONCURRENCY}，上限 ${MAX_CONCURRENCY}）`),

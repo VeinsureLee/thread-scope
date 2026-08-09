@@ -10,7 +10,7 @@ export function registerGetUserTool(server: McpServer): void {
     "forum-get-user",
     {
       title: "用户 · 查询用户资料",
-      description: "分类: 用户。按 uid 直接查询用户资料，可选查询特殊头衔；不遍历版块。",
+      description: "分类: 用户。按 uid 查询单用户资料（昵称/等级/积分等），可选特殊头衔，可选落库。前置: forum-login。关联: 文章/帖子/评论返回的作者 uid 可传入查询其完整资料。返回: 用户资料与特殊头衔。",
       inputSchema: z.object({
         uid: z.string().trim().min(1).describe("用户 ID（精确匹配，如 \"user_a\"）"),
         includeTitles: z.boolean().default(true).describe("是否同时查询特殊头衔（默认 true）"),

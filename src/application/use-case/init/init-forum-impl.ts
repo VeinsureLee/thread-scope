@@ -33,6 +33,10 @@ export interface InitBoardArticlesResult {
 }
 
 export interface InitResult extends InitStructureResult, InitManagersResult, InitBoardArticlesResult {
+  /** 本次是否爬取并缓存结构树 */
+  withStructure: boolean;
+  /** 本次是否收集版主资料/头衔 */
+  withManagers: boolean;
   /** 本次是否抓取首页文章 */
   withArticles: boolean;
 }
@@ -40,6 +44,13 @@ export interface InitResult extends InitStructureResult, InitManagersResult, Ini
 interface InitCommonOptions {
   concurrency?: number;
   store?: ContentStorePort;
+}
+
+/** 一键初始化参数：三个阶段可按开关组合。 */
+export interface InitForumOptions extends InitCommonOptions {
+  withStructure?: boolean;
+  withManagers?: boolean;
+  withArticles?: boolean;
 }
 
 /** 统计树中分区与版块数量。 */
@@ -170,8 +181,8 @@ export async function initManagers(
 /**
  * 初始化论坛首页：DFS 枚举全部版块，并发抓取每个版块的首页文章并落库。
  *
- * 这是最重的阶段（286 版块 ≈ 286 次请求）；从 forum-init 独立出来，
- * 由单独工具 forum-init-board-articles 按需调用。
+ * 这是最重的阶段（286 版块 ≈ 286 次请求）；由 forum-init withArticles=true 触发，
+ * 不单独暴露工具。
  */
 export async function initBoardArticles(
   options: InitCommonOptions = {},
@@ -231,24 +242,32 @@ export async function initBoardArticles(
 /**
  * 一键初始化论坛数据。
  *
- * 默认只做轻量部分：结构树 + 版主资料/头衔（不爬首页文章、不采集流量）。
- * withArticles=true 时才额外抓取各版首页文章（最重阶段）。
+ * 三个阶段按参数开关组合：
+ * - withStructure（默认 true）：爬取结构树并存 JSON 缓存
+ * - withManagers（默认 true）：收集版主资料/特殊头衔并落库
+ * - withArticles（默认 false）：抓各版首页文章落库（最重阶段）
+ *
+ * 默认 = 结构 + 版主（轻量，不爬首页文章、不采集流量）。
  *
  * @param dbPath         内容库路径（默认 forum-content.db）
  * @param structurePath  结构缓存路径（默认 data/structure-overview.json）
- * @param options         { concurrency?, store?, withArticles? }
+ * @param options         { withStructure?, withManagers?, withArticles?, concurrency?, store? }
  */
 export async function initForum(
   dbPath?: string,
   structurePath?: string,
-  options: InitCommonOptions & { withArticles?: boolean } = {},
+  options: InitForumOptions = {},
 ): Promise<InitResult> {
-  const withArticles = options.withArticles ?? false;
+  const { withStructure = true, withManagers = true, withArticles = false } = options;
   const store = options.store ?? new ContentDb(dbPath);
 
   try {
-    const structure = await initStructure(structurePath, { store });
-    const managers = await initManagers({ ...options, store });
+    const structure: InitStructureResult = withStructure
+      ? await initStructure(structurePath, { store })
+      : { sections: 0, boards: 0, treePath: "", errors: [] };
+    const managers: InitManagersResult = withManagers
+      ? await initManagers({ ...options, store })
+      : { managers: 0, managersFetched: 0, errors: [] };
     const boardArticles: InitBoardArticlesResult = withArticles
       ? await initBoardArticles({ ...options, store })
       : { articlesFetched: 0, articlesFailed: 0, errors: [] };
@@ -262,6 +281,8 @@ export async function initForum(
       articlesFetched: boardArticles.articlesFetched,
       articlesFailed: boardArticles.articlesFailed,
       errors: [...structure.errors, ...managers.errors, ...boardArticles.errors],
+      withStructure,
+      withManagers,
       withArticles,
     };
   } finally {
