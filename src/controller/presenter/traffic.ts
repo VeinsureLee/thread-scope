@@ -1,4 +1,4 @@
-import type { TrafficTreeNode } from "../../models/index.js";
+import type { TrafficTreeNode } from "../../model/dto/index.js";
 
 function formatTraffic(t: {
   onlineUsers?: string;

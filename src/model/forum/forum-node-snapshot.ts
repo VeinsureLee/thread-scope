@@ -16,6 +16,7 @@ export interface ForumNodeSnapshot {
   managers: UserRef[];
   traffic: TrafficInfo | null;
   trafficUpdatedAt: string | null;
+  parentSectionId?: string | null;
   baseUrl?: string;
   nodes?: ForumNodeSnapshot[];
 }

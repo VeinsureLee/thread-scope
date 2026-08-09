@@ -1,5 +1,5 @@
 import { requireLogin } from "../../auth/auth.js";
-import type { ForumTreeNode } from "../../models/index.js";
+import type { ForumTreeNode } from "../../model/dto/index.js";
 import { readJson, writeJson } from "../../storage/structure-store.js";
 import { crawlNodeTree } from "./tree.js";
 

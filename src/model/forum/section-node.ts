@@ -8,6 +8,11 @@ export class SectionNode extends ForumNode {
   constructor(options: ForumNodeOptions & { nodes?: readonly ForumNode[] }) {
     super("section", options);
     this.nodes = [...(options.nodes ?? [])];
+    // 为直接子版块补充 parentSectionId（立即祖先语义）：直接叶子归本分区。
+    // 嵌套 section 的叶子在更内层的 SectionNode 构造时由各自的父 section 归组。
+    for (const child of this.nodes) {
+      if (child.type === "board") child.assignParentSectionId(this.id);
+    }
     this.refreshDerivedState();
   }
 

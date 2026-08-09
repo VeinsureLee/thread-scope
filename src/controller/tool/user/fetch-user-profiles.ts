@@ -11,12 +11,12 @@ export function registerFetchUserProfilesTool(server: McpServer): void {
     "forum-fetch-user-profiles",
     {
       title: "用户 · 批量抓取用户资料",
-      description: "分类: 用户。批量抓取用户资料并写入 user 表；uids 支持单个字符串或字符串数组。",
+      description: "分类: 用户。批量抓取用户资料并写入 user 表；uids 支持单个字符串或字符串数组（如 \"user_a\" 或 [\"user_a\",\"user_b\"]）。不传 uids 时抓取已落库的全部用户。",
       inputSchema: z.object({
-        uids: z.union([z.string(), z.array(z.string())]).optional(),
-        concurrency: z.number().int().positive().max(MAX_CONCURRENCY).default(DEFAULT_CONCURRENCY),
-        force: z.boolean().default(false),
-        persist: z.boolean().default(true),
+        uids: z.union([z.string(), z.array(z.string())]).optional().describe("目标用户 uid：单个字符串（如 \"user_a\"）或字符串数组（如 [\"user_a\",\"user_b\"]）；不传则更新已落库的全部用户"),
+        concurrency: z.number().int().positive().max(MAX_CONCURRENCY).default(DEFAULT_CONCURRENCY).describe(`并发度（默认 ${DEFAULT_CONCURRENCY}，上限 ${MAX_CONCURRENCY}）`),
+        force: z.boolean().default(false).describe("是否忽略 TTL 强制重抓（默认 false：profile_fetched_at 距今 72h 内的用户跳过；true 则全部重抓）"),
+        persist: z.boolean().default(true).describe("是否将抓取的资料写入 user 表（默认 true）"),
       }),
     },
     async ({ uids, concurrency, force, persist }) => {

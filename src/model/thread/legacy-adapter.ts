@@ -1,4 +1,4 @@
-import type { Post, ThreadDetail } from "../../models/index.js";
+import type { Post, ThreadDetail } from "../../model/dto/index.js";
 import { ArticleNode } from "./article-node.js";
 import { Thread } from "./thread.js";
 import type { ArticleOverview } from "./article-overview.js";

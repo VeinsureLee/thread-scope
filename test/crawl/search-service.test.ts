@@ -1,7 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { searchBoardArticles } from "../../src/crawl/search/service.js";
-import { searchBoards } from "../../src/application/use-case/search/search-boards.js";
+import { searchBoardsGrouped } from "../../src/application/use-case/search/search-boards.js";
 import type { SearchRepository } from "../../src/crawl/search/repository.js";
+import type { ForumTreeNode } from "../../src/model/dto/index.js";
 
 // TrafficDb 打桩：getLatestAll 返回空 → 默认范围回退到论坛树前 N 版（确定性测试）
 vi.mock("../../src/storage/traffic-db.js", () => {
@@ -78,9 +79,28 @@ describe("crawl/search — searchBoardArticles", () => {
   });
 });
 
-describe("crawl/search — searchBoards（并发池）", () => {
+describe("crawl/search — searchBoardsGrouped（按版并发分组）", () => {
   beforeEach(() => setTestCookie());
   afterEach(() => clearCookie());
+
+  /** 与目标版面集合对应的合成树（供 searchBoardsGrouped 水合 ForumNode）。 */
+  function makeTree(boards: string[]): ForumTreeNode[] {
+    return [
+      {
+        id: "sec-1",
+        name: "示例分区",
+        type: "section",
+        level: 1,
+        children: boards.map((ename, i) => ({
+          id: `board-${ename}`,
+          name: `示例版${i}`,
+          type: "board",
+          level: 2,
+          board: { name: `示例版${i}`, ename, manager: [] },
+        })),
+      },
+    ];
+  }
 
   /** 记录 fetch 调用时在途并发峰值，并给每个版面打不同延迟 */
   class TrackedRepo implements SearchRepository {
@@ -111,13 +131,14 @@ describe("crawl/search — searchBoards（并发池）", () => {
 
   it("并发度不超过 limit，且结果保序聚合", async () => {
     const repo = new TrackedRepo();
-    const boards = ["Demo", "X1", "X2", "X3", "X4"];
-    const hits = await searchBoards(boards, "示例", {}, 2, repo);
+    const tree = makeTree(["Demo", "X1", "X2", "X3", "X4"]);
+    const groups = await searchBoardsGrouped(["Demo", "X1", "X2", "X3", "X4"], "示例", {}, 2, tree, repo);
 
     expect(repo.peak).toBeLessThanOrEqual(2);
     // 只有 Demo 有命中；结果含 Demo 的 2 条且先于其他版面
-    expect(hits.length).toBeGreaterThanOrEqual(2);
-    expect(hits[0]!.boardEname).toBe("Demo");
+    expect(groups).toHaveLength(1);
+    expect(groups[0]!.boardEname).toBe("Demo");
+    expect(groups[0]!.count).toBe(2);
   });
 
   it("单版面失败不中断其他版面", async () => {
@@ -128,8 +149,9 @@ describe("crawl/search — searchBoards（并发池）", () => {
       }
     }
     const repo = new FlakyRepo();
-    const hits = await searchBoards(["Fail", "Demo"], "示例", {}, 2, repo);
-    expect(hits.length).toBeGreaterThanOrEqual(2);
-    expect(hits.every((h) => h.boardEname === "Demo")).toBe(true);
+    const tree = makeTree(["Fail", "Demo"]);
+    const groups = await searchBoardsGrouped(["Fail", "Demo"], "示例", {}, 2, tree, repo);
+    expect(groups).toHaveLength(1);
+    expect(groups[0]!.boardEname).toBe("Demo");
   });
 });

@@ -1,4 +1,4 @@
-import type { ArticleRow, Post, TrafficHistoryPoint, UserProfile } from "../../models/index.js";
+import type { ArticleRow, Post, TrafficHistoryPoint, UserProfile } from "../../model/dto/index.js";
 import type { Thread } from "../thread/thread.js";
 
 export interface ArticleStorePort {

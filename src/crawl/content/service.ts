@@ -1,5 +1,5 @@
 import { requireLogin } from "../../auth/auth.js";
-import type { Post, ThreadDetail } from "../../models/index.js";
+import type { Post, ThreadDetail } from "../../model/dto/index.js";
 import { parsePagination } from "../common/paginator.js";
 import { load } from "cheerio";
 import { ThreadRepository, HttpThreadRepository } from "./repository.js";

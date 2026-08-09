@@ -1,7 +1,8 @@
 import { ContentDb } from "../../../storage/content-db.js";
 import { selectors } from "../../../core/config.js";
-import type { SearchThreadHit } from "../../../models/index.js";
+import type { SearchThreadHit } from "../../../model/dto/index.js";
 import { searchThreads, type SearchThreadsOptions } from "./search-threads.js";
+import { limitPerBoard } from "../../../model/index.js";
 import type { ContentStorePort, LocalThreadSearchHit } from "../../../model/index.js";
 
 type LocalThreadHit = LocalThreadSearchHit;
@@ -9,7 +10,6 @@ type LocalThreadHit = LocalThreadSearchHit;
 export interface SearchThreadsUseCaseOptions extends SearchThreadsOptions {
   readonly keyword?: string;
   readonly source?: "auto" | "local" | "remote";
-  readonly boardName?: string;
   readonly persist?: boolean;
   readonly store?: ContentStorePort;
 }
@@ -66,10 +66,12 @@ export async function searchThreadsUseCase(
     const startedAt = Date.now();
     const db = options.store ?? new ContentDb();
     try {
-      const localHits = db.searchThreadsContent(keyword, {
-        boardEname: options.scope === "board" ? options.boardName : undefined,
-        limit: options.maxThreads ?? 20,
-      });
+      let localHits = db.searchThreadsContent(keyword, { limit: options.maxThreads ?? 100 });
+      // 显式多版时每版限流；否则全局上限
+      const explicitBoards = Array.isArray(options.boards)
+        ? options.boards.length > 0
+        : typeof options.boards === "string" && options.boards.trim().length > 0;
+      if (explicitBoards) localHits = limitPerBoard(localHits, options.maxThreadsPerBoard ?? 2);
       if (localHits.length > 0 || source === "local") {
         return {
           kind: "results",
@@ -86,8 +88,8 @@ export async function searchThreadsUseCase(
   }
 
   const startedAt = Date.now();
-  const result = await searchThreads(options.boardName, keyword ?? "", options);
-  const hits = result.hits.slice(0, options.maxThreads ?? 20);
+  const result = await searchThreads(options.boards, keyword ?? "", options);
+  const hits = result.hits;
   if (options.persist && hits.length > 0) persistHits(hits, options.store);
   return {
     kind: "results",

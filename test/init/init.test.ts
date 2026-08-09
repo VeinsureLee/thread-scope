@@ -3,7 +3,7 @@ import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
 import { collectBoardManagers, collectBoardNodes, initForum, initStructure, initManagers, initBoardArticles } from "../../src/application/use-case/init/init-forum.js";
-import type { ArticleRow, ForumTreeNode } from "../../src/models/index.js";
+import type { ArticleRow, ForumTreeNode } from "../../src/model/dto/index.js";
 import { saveCookie, clearCookie } from "../../src/core/http-client.js";
 
 // ── 合成测试树（不包含真实论坛内容） ──

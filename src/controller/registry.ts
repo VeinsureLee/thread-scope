@@ -10,7 +10,6 @@ import { registerInitManagersTool } from "./tool/init/init-managers-tool.js";
 import { registerInitBoardArticlesTool } from "./tool/init/init-board-articles-tool.js";
 import { registerSearchArticlesTool } from "./tool/search/search-articles.js";
 import { registerSearchThreadsTool } from "./tool/search/search-threads.js";
-import { registerSearchUserPostsTool } from "./tool/search/search-user-posts.js";
 import { registerFetchThreadTool } from "./tool/thread/fetch-thread.js";
 import { registerFetchUserProfilesTool } from "./tool/user/fetch-user-profiles.js";
 import { registerFetchUserTitlesTool } from "./tool/user/fetch-user-titles.js";
@@ -29,7 +28,6 @@ export function registerAllTools(server: McpServer): void {
   registerInitBoardArticlesTool(server);
   registerSearchArticlesTool(server);
   registerSearchThreadsTool(server);
-  registerSearchUserPostsTool(server);
   registerFetchThreadTool(server);
   registerFetchUserProfilesTool(server);
   registerFetchUserTitlesTool(server);

@@ -1,4 +1,4 @@
-import type { ForumTreeNode } from "../../models/index.js";
+import type { ForumTreeNode } from "../../model/dto/index.js";
 
 export function presentStructure(result: {
   kind: "children" | "tree";

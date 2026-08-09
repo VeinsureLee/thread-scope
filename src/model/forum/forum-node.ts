@@ -45,6 +45,7 @@ export interface ForumNodeOptions {
   readonly managers?: readonly UserRef[];
   readonly traffic?: TrafficInfo | null;
   readonly trafficUpdatedAt?: string | null;
+  readonly parentSectionId?: string | null;
 }
 
 /**
@@ -62,6 +63,8 @@ export abstract class ForumNode {
   traffic: TrafficInfo | null;
   trafficUpdatedAt: string | null;
   managers: UserRef[];
+  /** 直接父分区 ID（版块叶子用于流量按分区归组；root 为 null）。 */
+  readonly parentSectionId: string | null;
 
   protected constructor(type: ForumNodeType, options: ForumNodeOptions) {
     this.type = type;
@@ -72,6 +75,14 @@ export abstract class ForumNode {
     this.traffic = options.traffic ?? null;
     this.trafficUpdatedAt = options.trafficUpdatedAt ?? null;
     this.managers = [...(options.managers ?? [])];
+    this.parentSectionId = options.parentSectionId ?? null;
+  }
+
+  /** 建树阶段专用：为尚缺父分区的版块叶子补充直接父分区 ID（仅内部/树构建调用）。 */
+  assignParentSectionId(sectionId: string): void {
+    if (this.type === "board" && this.parentSectionId === null) {
+      (this as { parentSectionId: string | null }).parentSectionId = sectionId;
+    }
   }
 
   abstract children(): readonly ForumNode[];

@@ -1,5 +1,93 @@
-import type { ForumTreeNode } from "../../../models/index.js";
+import type { ForumTreeNode } from "../../../model/dto/index.js";
 import { bfs, dfs } from "../common/traversal.js";
+
+/** 节点查找索引：把多种别名（id / 去前缀 id / ename / 中文名）映射到树节点。 */
+export interface ForumTreeIndex {
+  /** 别名键 → 节点（board 与 section 混存）。 */
+  readonly byKey: Map<string, ForumTreeNode>;
+  /** 全部版块叶子，按树序。 */
+  readonly boards: Extract<ForumTreeNode, { type: "board" }>[];
+  /** 全部 section 分支，按树序。 */
+  readonly sections: Extract<ForumTreeNode, { type: "section" }>[];
+}
+
+/** 生成候选别名键（小写化便于模糊匹配；不含空串）。 */
+function aliasKeys(node: ForumTreeNode): string[] {
+  const keys: string[] = [];
+  const push = (key: string): void => {
+    const k = key.trim().toLowerCase();
+    if (k) keys.push(k);
+  };
+  push(node.id);
+  push(node.id.replace(/[()]/g, "").replace(/^board-/, "").replace(/^sec-/, ""));
+  if (node.type === "board") {
+    push(node.board.ename);
+    push(node.name);
+  } else {
+    push(node.name);
+  }
+  return keys;
+}
+
+/**
+ * 构建论坛树查找索引（哈希化，文档 §2.1）。
+ *
+ * 一次遍历把所有节点按多种别名（精确 id、去前缀/括号的 clean id、版块 ename、
+ * 版块中文名、分区中文名）建成 Map，替代多次全树 DFS 扫描。
+ *
+ * @param tree 论坛 DTO 树
+ */
+export function buildForumTreeIndex(tree: readonly ForumTreeNode[]): ForumTreeIndex {
+  const byKey = new Map<string, ForumTreeNode>();
+  const boards: Extract<ForumTreeNode, { type: "board" }>[] = [];
+  const sections: Extract<ForumTreeNode, { type: "section" }>[] = [];
+  for (const node of dfs(tree, { childrenOf: (n) => n.type === "section" ? n.children : [] })) {
+    if (node.type === "board") boards.push(node);
+    else sections.push(node);
+    for (const key of aliasKeys(node)) {
+      if (!byKey.has(key)) byKey.set(key, node);
+    }
+  }
+  return { byKey, boards, sections };
+}
+
+/** 清理输入的别名键（去括号/前缀，小写化）。 */
+function cleanEntry(entry: string): string {
+  return entry.trim().toLowerCase().replace(/[()]/g, "").replace(/^board-/, "").replace(/^sec-/, "");
+}
+
+/**
+ * 解析一批"版块 / 分区"条目为版块集合。
+ *
+ * 每个条目可以是：版块 ename（Demo）、分区 id（sec-0）、版块中文名、分区中文名。
+ * 命中版块取自身，命中分区取其下全部后代版块；按树序去重。
+ *
+ * @returns 解析出的版块英文名（树序）与无法解析的条目
+ */
+export function resolveBoardsFromEntries(
+  index: ForumTreeIndex,
+  entries: readonly string[],
+): { enames: string[]; unresolved: string[] } {
+  const enames: string[] = [];
+  const seen = new Set<string>();
+  const unresolved: string[] = [];
+  for (const entry of entries) {
+    const node = index.byKey.get(cleanEntry(entry)) ?? index.byKey.get(entry.trim().toLowerCase());
+    if (!node) {
+      unresolved.push(entry.trim());
+      continue;
+    }
+    const boards = node.type === "board"
+      ? [node as Extract<ForumTreeNode, { type: "board" }>]
+      : collectBoards(node.children);
+    for (const board of boards) {
+      if (seen.has(board.board.ename)) continue;
+      seen.add(board.board.ename);
+      enames.push(board.board.ename);
+    }
+  }
+  return { enames, unresolved };
+}
 
 /**
  * Forum DTO 树的遍历/查询算法（文档 §2.1 tree-index.ts）。
@@ -49,6 +137,7 @@ export function boardManagers(tree: ForumTreeNode[]): string[] {
  * - 精确 ID：`board-Demo` / `sec-0`
  * - 去前缀：`Demo`（→ board-Demo 或 sec-Demo）
  * - 版块英文名等价：Board 节点的 `board.ename` 也算命中
+ * - 中文名等价：Section 或 Board 节点的 `name`（清理括号后）也算命中
  *
  * @returns 匹配节点；未找到返回 null
  */
@@ -66,7 +155,8 @@ export function findNodeById(
       node.id === clean ||
       node.id === `board-${clean}` ||
       node.id === `sec-${clean}` ||
-      (node.type === "board" && node.board.ename === clean)
+      (node.type === "board" && node.board.ename === clean) ||
+      node.name.replace(/[()]/g, "") === clean
     ) {
       return node;
     }

@@ -1,5 +1,5 @@
 import { selectors } from "../../core/config.js";
-import type { ArticleRow } from "../../models/index.js";
+import type { ArticleRow } from "../../model/dto/index.js";
 import { parseArticleList } from "../article/parser.js";
 
 /**

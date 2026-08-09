@@ -1,5 +1,5 @@
 import { requireLogin } from "../../auth/auth.js";
-import type { UserProfile } from "../../models/index.js";
+import type { UserProfile } from "../../model/dto/index.js";
 import { mapWithConcurrency } from "../common/async-pool.js";
 import { DEFAULT_CONCURRENCY, USER_PROFILE_TTL_HOURS } from "../../core/config.js";
 import { logWarn } from "../../logging/logger.js";

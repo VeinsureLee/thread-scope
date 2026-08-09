@@ -6,7 +6,7 @@ import {
   defaultIsFresh,
 } from "../../../view/user/index.js";
 import type { FetchUserProfileResult } from "../../../view/user/index.js";
-import type { UserProfile } from "../../../models/index.js";
+import type { UserProfile } from "../../../model/dto/index.js";
 import { ContentDb } from "../../../storage/content-db.js";
 import type { ContentStorePort } from "../../../model/index.js";
 

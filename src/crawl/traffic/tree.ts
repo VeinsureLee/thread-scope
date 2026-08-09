@@ -1,4 +1,4 @@
-import type { ForumTreeNode, TrafficInfo, TrafficTreeNode } from "../../models/index.js";
+import type { ForumTreeNode, TrafficInfo, TrafficTreeNode } from "../../model/dto/index.js";
 
 /**
  * 从 structure 树 + 流量记录派生树状流量视图。

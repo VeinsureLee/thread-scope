@@ -1,7 +1,7 @@
 import { createHash } from "crypto";
 import { DatabaseSync } from "node:sqlite";
 import { openDb, transaction } from "./db-common.js";
-import type { ArticleRow, Post } from "../models/index.js";
+import type { ArticleRow, Post } from "../model/dto/index.js";
 import type { Thread } from "../model/index.js";
 import { flattenArticleNodes } from "./mapper/thread-mapper.js";
 

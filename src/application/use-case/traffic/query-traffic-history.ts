@@ -1,5 +1,5 @@
 import { TrafficDb } from "../../../storage/traffic-db.js";
-import type { TrafficHistoryPoint } from "../../../models/index.js";
+import type { TrafficHistoryPoint } from "../../../model/dto/index.js";
 import type { ClosablePort, TrafficStorePort } from "../../../model/index.js";
 
 export interface QueryTrafficHistoryOptions {

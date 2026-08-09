@@ -22,8 +22,8 @@ default_encoding: "gbk"
 
 # ── 请求限速（毫秒）：每两次实际请求的最小间隔 ──
 # 全站共享同一限速队列（PageFetcher 令牌队列），并发再高也不会超过
-# 1 秒内请求数 = 1000 / request_interval_ms。默认 20ms → 50 req/s。
-request_interval_ms: 20
+# 1 秒内请求数 = 1000 / request_interval_ms。默认 10ms → 100 req/s。
+request_interval_ms: 10
 
 # ── 异步并发（工作池） ──
 # 同时"在途"的独立任务数上限（跨版面搜索 / 帖子正文抓取 / 分区流量采集）。

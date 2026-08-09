@@ -1,272 +1,70 @@
 import { describe, it, expect } from "vitest";
 import { load } from "cheerio";
+import { BoardNode, ForumRootNode, SectionNode } from "../../src/model/index.js";
+import { groupBoardsBySection } from "../../src/model/algorithm/forum/traffic-aggregate.js";
 
 /**
  * 单元测试：验证流量信息采集逻辑（无需网络）。
  *
  * 测试指标：
- * - collectLeafBoards 递归收集版块叶子节点
+ * - groupBoardsBySection 按直接父分区把版块叶子归组
  * - parseSectionTraffic 从 HTML 提取流量字段
  *
  * 注意：所有名称与数据均为合成测试数据，不包含真实论坛内容。
  */
 
 // ============================================================
-// collectLeafBoards 测试（模拟类型和内联逻辑）
+// groupBoardsBySection 测试（真实 ForumNode 实体）
 // ============================================================
 
-/** 简化的 ForumTreeNode 类型（不依赖 YAML 加载） */
-interface TestBoardNode {
-  id: string;
-  name: string;
-  type: "board";
-  level: number;
-  board: { name: string; ename: string; manager: string[] };
+/** 构造两分区树：sec-alpha(b1,b2) + sec-beta(b3, 嵌套 sub-gamma 的 b4,b5) */
+function makeGroupingForum(): ForumRootNode {
+  const b1 = new BoardNode({ id: "board-b1", name: "版块一", ename: "b1", depth: 2 });
+  const b2 = new BoardNode({ id: "board-b2", name: "版块二", ename: "b2", depth: 2 });
+  const sectionAlpha = new SectionNode({ id: "sec-alpha", name: "分区甲", depth: 1, nodes: [b1, b2] });
+
+  const b3 = new BoardNode({ id: "board-b3", name: "版块三", ename: "b3", depth: 2 });
+  const b4 = new BoardNode({ id: "board-b4", name: "版块甲", ename: "b4", depth: 3 });
+  const b5 = new BoardNode({ id: "board-b5", name: "版块乙", ename: "b5", depth: 3 });
+  const subGamma = new SectionNode({ id: "sub-gamma", name: "子分区丙", depth: 2, nodes: [b4, b5] });
+  const sectionBeta = new SectionNode({ id: "sec-beta", name: "分区乙", depth: 1, nodes: [b3, subGamma] });
+
+  return new ForumRootNode({ id: "forum-root", name: "Forum", depth: 0, nodes: [sectionAlpha, sectionBeta] });
 }
 
-interface TestSectionNode {
-  id: string;
-  name: string;
-  type: "section";
-  level: number;
-  children: TestTreeNode[];
-}
+describe("groupBoardsBySection（按父分区归组）", () => {
+  it("版块叶子按直接父分区分组，保持输入顺序", () => {
+    const forum = makeGroupingForum();
+    const groups = groupBoardsBySection(forum.collectBoards("dfs"));
 
-type TestTreeNode = TestSectionNode | TestBoardNode;
-
-interface LeafBoardRef {
-  node: TestBoardNode;
-  parentSectionId: string;
-}
-
-/**
- * 模拟 collectLeafBoards 的核心逻辑：
- * 从树中查找 nodeId，递归收集所有 BoardNode 叶子。
- *
- * @param tree     完整树
- * @param nodeId   目标节点 ID
- * @param parentId 当前节点的父分区 ID（递归时传入）
- */
-function collectLeafBoards(
-  tree: TestTreeNode[],
-  nodeId: string,
-  parentId: string = "",
-): { leaves: LeafBoardRef[]; nodeName: string } {
-  /** 清理 nodeId：去括号、去 board-/sec- 前缀，得到纯英文名/sectionId/中文名 */
-  const cleanNodeId = nodeId.replace(/[()]/g, "").replace(/^board-/, "").replace(/^sec-/, "");
-  const boardPrefixedId = `board-${cleanNodeId}`;
-  const secPrefixedId = `sec-${cleanNodeId}`;
-
-  for (const node of tree) {
-    // ── 弹性匹配 ──
-    let matched = false;
-    if (node.id === nodeId || node.id === boardPrefixedId || node.id === secPrefixedId || node.id === cleanNodeId) {
-      matched = true;
-    } else if (node.type === "board") {
-      const cleanEname = (node.board.ename ?? "").replace(/[()]/g, "");
-      if (cleanEname === cleanNodeId) {
-        matched = true;
-      }
-    } else if (node.type === "section") {
-      const cleanSectionName = node.name.replace(/[()]/g, "");
-      if (cleanSectionName === cleanNodeId) {
-        matched = true;
-      }
-    }
-
-    if (matched) {
-      if (node.type === "board") {
-        return {
-          leaves: [{ node, parentSectionId: parentId }],
-          nodeName: node.name,
-        };
-      }
-      // section → 递归收集所有叶子
-      const leaves: LeafBoardRef[] = [];
-      function gather(nodes: TestTreeNode[], parentSectionId: string) {
-        for (const child of nodes) {
-          if (child.type === "board") {
-            leaves.push({ node: child, parentSectionId });
-          } else {
-            gather(child.children, child.id);
-          }
-        }
-      }
-      gather(node.children, nodeId);
-      return { leaves, nodeName: node.name };
-    }
-
-    if (node.type === "section") {
-      const result = collectLeafBoards(node.children, nodeId, node.id);
-      if (result.leaves.length > 0 || result.nodeName) {
-        return result;
-      }
-    }
-  }
-
-  return { leaves: [], nodeName: "" };
-}
-
-/** 构建测试用树（全部为合成名称） */
-function makeTestTree(): TestTreeNode[] {
-  return [
-    {
-      id: "sec-alpha",
-      name: "分区甲",
-      type: "section",
-      level: 1,
-      children: [
-        {
-          id: "board-b1",
-          name: "版块一",
-          type: "board",
-          level: 2,
-          board: { name: "版块一", ename: "b1", manager: ["moderator1"] },
-        },
-        {
-          id: "board-b2",
-          name: "版块二",
-          type: "board",
-          level: 2,
-          board: { name: "版块二", ename: "b2", manager: ["moderator1"] },
-        },
-      ],
-    },
-    {
-      id: "zone-beta",
-      name: "分区乙",
-      type: "section",
-      level: 1,
-      children: [
-        {
-          id: "board-b3",
-          name: "版块三",
-          type: "board",
-          level: 2,
-          board: { name: "版块三", ename: "b3", manager: ["recruiter1"] },
-        },
-        {
-          id: "sub-gamma",
-          name: "子分区丙",
-          type: "section",
-          level: 2,
-          children: [
-            {
-              id: "board-b4",
-              name: "版块甲",
-              type: "board",
-              level: 3,
-              board: { name: "版块甲", ename: "b4", manager: [] },
-            },
-            {
-              id: "board-b5",
-              name: "版块乙",
-              type: "board",
-              level: 3,
-              board: { name: "版块乙", ename: "b5", manager: [] },
-            },
-          ],
-        },
-      ],
-    },
-  ];
-}
-
-describe("collectLeafBoards（叶节点收集）", () => {
-  const tree = makeTestTree();
-
-  it("传入 board 节点返回自身", () => {
-    const { leaves, nodeName } = collectLeafBoards(tree, "board-b1");
-
-    expect(leaves).toHaveLength(1);
-    expect(leaves[0]!.node.id).toBe("board-b1");
-    expect(leaves[0]!.parentSectionId).toBe("sec-alpha");
-    expect(nodeName).toBe("版块一");
+    expect(groups).toHaveLength(3);
+    expect(groups.map((g) => g.sectionId)).toEqual(["sec-alpha", "sec-beta", "sub-gamma"]);
+    expect(groups[0]!.boards.map((b) => b.ename)).toEqual(["b1", "b2"]);
+    expect(groups[1]!.boards.map((b) => b.ename)).toEqual(["b3"]);
+    // 嵌套叶子归其直接父分区 sub-gamma，而不是外层 sec-beta（立即祖先语义）
+    expect(groups[2]!.boards.map((b) => b.ename)).toEqual(["b4", "b5"]);
   });
 
-  it("传入 section 节点收集所有子孙 boards", () => {
-    const { leaves, nodeName } = collectLeafBoards(tree, "sec-alpha");
-
-    expect(nodeName).toBe("分区甲");
-    expect(leaves).toHaveLength(2);
-    expect(leaves.map((l) => l.node.id).sort()).toEqual(["board-b1", "board-b2"]);
-    // 所有叶子应归属到该分区
-    leaves.forEach((l) => {
-      expect(l.parentSectionId).toBe("sec-alpha");
-    });
+  it("未指定 parentSectionId 的叶子归入空分区组", () => {
+    const a = new BoardNode({ id: "board-a", name: "甲", ename: "a", depth: 1 });
+    const b = new BoardNode({ id: "board-b", name: "乙", ename: "b", depth: 1 });
+    const groups = groupBoardsBySection([a, b]);
+    expect(groups).toHaveLength(1);
+    expect(groups[0]!.sectionId).toBe("");
+    expect(groups[0]!.boards.map((x) => x.ename)).toEqual(["a", "b"]);
   });
 
-  it("传入深层 section 收集子孙 boards（二级目录）", () => {
-    const { leaves, nodeName } = collectLeafBoards(tree, "sub-gamma");
-
-    expect(nodeName).toBe("子分区丙");
-    expect(leaves).toHaveLength(2);
-    expect(leaves.map((l) => l.node.name).sort()).toEqual(["版块乙", "版块甲"]);
+  it("空输入返回空分组", () => {
+    expect(groupBoardsBySection([])).toEqual([]);
   });
 
-  it("传入顶级 section 收集全部 boards", () => {
-    const { leaves } = collectLeafBoards(tree, "zone-beta");
-
-    expect(leaves).toHaveLength(3); // b3 + b4 + b5
-    // 直接子板 parent 为 zone-beta，嵌套子板 parent 为 sub-gamma
-    const b3 = leaves.find((l) => l.node.id === "board-b3")!;
-    expect(b3.parentSectionId).toBe("zone-beta");
-    const b4 = leaves.find((l) => l.node.id === "board-b4")!;
-    expect(b4.parentSectionId).toBe("sub-gamma");
-  });
-
-  it("空树返回空结果", () => {
-    const { leaves, nodeName } = collectLeafBoards([], "anything");
-    expect(leaves).toHaveLength(0);
-    expect(nodeName).toBe("");
-  });
-
-  it("section 下无 boards 返回空 leaves", () => {
-    const emptySection: TestTreeNode[] = [
-      { id: "empty", name: "空分区", type: "section", level: 1, children: [] },
-    ];
-    const { leaves, nodeName } = collectLeafBoards(emptySection, "empty");
-    expect(leaves).toHaveLength(0);
-    expect(nodeName).toBe("空分区");
-  });
-
-  it("深层嵌套 board（level 3+）正确追溯 parentSectionId", () => {
-    const { leaves } = collectLeafBoards(tree, "board-b5");
-    expect(leaves).toHaveLength(1);
-    expect(leaves[0]!.parentSectionId).toBe("sub-gamma");
-  });
-
-  it("传入 section 中文名匹配分区（Tier 4）", () => {
-    const { leaves, nodeName } = collectLeafBoards(tree, "分区乙");
-    expect(nodeName).toBe("分区乙");
-    expect(leaves).toHaveLength(3); // b3 + b4 + b5
-  });
-
-  it("传入 section 中文名匹配嵌套分区", () => {
-    const { leaves, nodeName } = collectLeafBoards(tree, "子分区丙");
-    expect(nodeName).toBe("子分区丙");
-    expect(leaves).toHaveLength(2);
-    expect(leaves.map((l) => l.node.name).sort()).toEqual(["版块乙", "版块甲"]);
-  });
-
-  it("传入 sec- 前缀匹配分区 ID", () => {
-    const { leaves, nodeName } = collectLeafBoards(tree, "sec-alpha");
-    expect(nodeName).toBe("分区甲");
-    expect(leaves).toHaveLength(2);
-  });
-
-  it("传入 sec- 前缀匹配分区 ID（zone-beta → sec-zone-beta）", () => {
-    const { leaves, nodeName } = collectLeafBoards(tree, "sec-zone-beta");
-    expect(nodeName).toBe("分区乙");
-    expect(leaves).toHaveLength(3);
-  });
-
-  it("传入带括号的输入（如 board-(b1) 式样）", () => {
-    // 即使树中没有该节点，应能匹配到 board-b1
-    const { leaves, nodeName } = collectLeafBoards(tree, "board-(b1)");
-    expect(nodeName).toBe("版块一");
-    expect(leaves).toHaveLength(1);
-    expect(leaves[0]!.node.id).toBe("board-b1");
+  it("顶层 board（root 直接子）parentSectionId 为 null 归空分区组", () => {
+    const top = new BoardNode({ id: "board-top", name: "顶", ename: "top", depth: 1 });
+    const root = new ForumRootNode({ id: "forum-root", name: "Forum", depth: 0, nodes: [top] });
+    const groups = groupBoardsBySection(root.collectBoards());
+    expect(groups).toHaveLength(1);
+    expect(groups[0]!.sectionId).toBe("");
+    expect(groups[0]!.boards.map((b) => b.ename)).toEqual(["top"]);
   });
 });
 

@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { collectBoards, boardEnames, boardManagers, findNodeById } from "../../src/model/algorithm/forum/tree-index.js";
-import type { ForumTreeNode } from "../../src/models/index.js";
+import type { ForumTreeNode } from "../../src/model/dto/index.js";
 
 // ── 合成测试树（不包含真实论坛内容） ──
 const TREE: ForumTreeNode[] = [

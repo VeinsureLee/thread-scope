@@ -1,4 +1,4 @@
-import type { User, UserProfile } from "../../models/index.js";
+import type { User, UserProfile } from "../../model/dto/index.js";
 import { selectors } from "../../core/config.js";
 import { uidFromHref, isAnonLink } from "../common/parser-kit.js";
 

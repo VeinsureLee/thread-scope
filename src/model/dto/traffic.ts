@@ -1,18 +1,4 @@
-/** 版面流量信息 */
-export interface TrafficInfo {
-  /** 版面英文名 */
-  ename: string;
-  /** 版面中文名 */
-  name: string;
-  /** 在线人数 */
-  onlineUsers: string;
-  /** 今日发帖数 */
-  todayPosts: string;
-  /** 主题数 */
-  threads: string;
-  /** 发帖总数（文章数） */
-  posts: string;
-}
+import type { TrafficInfo } from "../traffic/traffic-info.js";
 
 /** 流量快照（保存到文件及 MCP 工具返回） */
 export interface TrafficSnapshot {
@@ -24,7 +10,7 @@ export interface TrafficSnapshot {
 }
 
 /**
- * 树状流量节点（对齐 ForumTreeNode 的结构）。
+ * 树状流量节点（对齐 ForumTreeNode 的结构，DTO）。
  *
  * - board：traffic 为自身实时流量
  * - section：traffic 为其下全部后代 board 的聚合

@@ -1,25 +1,26 @@
 import { requireLogin } from "../../../auth/auth.js";
-import type { SearchThreadHit, ArticleRow, ForumTreeNode } from "../../../models/index.js";
+import type { SearchThreadHit, ArticleRow, ForumTreeNode } from "../../../model/dto/index.js";
 import { fetchThreadDetail } from "../../../view/thread/index.js";
 import { articleIdFromUrl, boardFromArticleUrl } from "../../../crawl/article/index.js";
-import { searchBoardArticles } from "../../../view/search/index.js";
-import { resolveScope, type SearchScope } from "./scope-resolver.js";
+import { searchBoardsGrouped } from "./search-boards.js";
+import { resolveSearchBoards, type ResolvedSearchScope } from "./resolve-search-boards.js";
 import { defaultTaskExecutor } from "../../execution/async-task-executor.js";
 import { DEFAULT_CONCURRENCY } from "../../../core/config.js";
 import { fetchForumTree } from "../../../view/structure/index.js";
 import type { SearchRepository } from "../../../crawl/search/index.js";
 import type { ThreadRepository } from "../../../crawl/content/index.js";
-import { threadFromLegacyDetail } from "../../../model/index.js";
+import { threadFromLegacyDetail, limitPerBoard } from "../../../model/index.js";
 
 export interface SearchThreadsOptions {
-  scope?: "all" | "top" | "board" | "section" | "auto";
+  boards?: string | readonly string[];
   author?: string;
   maxPages?: number;
   maxItems?: number;
-  maxBoards?: number;
+  /** 显式 boards（custom）时每版最多抓取 N 条，默认 2。 */
+  maxThreadsPerBoard?: number;
+  /** all/top 大范围时的全局抓取上限，默认 100。 */
   maxThreads?: number;
   maxThreadPages?: number;
-  topCount?: number;
   concurrency?: number;
   tree?: ForumTreeNode[];
 }
@@ -31,43 +32,43 @@ export interface SearchThreadsRepositories {
 
 /**
  * 搜索 Thread 用例：
- * 1. ResolveScope 只决定任务范围；
+ * 1. resolveSearchBoards 决定目标版块集合与范围类型（all/top/custom）；
  * 2. ForumNode/算法产生的版面顺序交由版面搜索池执行；
- * 3. 命中后受 maxThreads 限制，再交由独立 Thread 池抓详情；
+ * 3. 命中后：custom 模式每版限 maxThreadsPerBoard 条，all/top 模式全局限 maxThreads 条；
+ *    再交由独立 Thread 池抓详情；
  * 4. View 只负责单版面/单详情页读取，所有跨资源并发由此处控制。
  */
 export async function searchThreads(
-  nodeId: string | undefined,
+  boards: string | readonly string[] | undefined,
   keyword: string,
   opts: SearchThreadsOptions = {},
   repos: SearchThreadsRepositories = {},
-): Promise<{ scope: SearchScope; hits: SearchThreadHit[] }> {
+): Promise<{ scope: ResolvedSearchScope; hits: SearchThreadHit[] }> {
   requireLogin();
 
   const tree = opts.tree ?? (await fetchForumTree());
-  const scope = resolveScope(opts.scope, nodeId, tree, opts.topCount ?? 5, opts.maxBoards);
+  const scope = resolveSearchBoards(tree, boards);
   const concurrency = opts.concurrency ?? DEFAULT_CONCURRENCY;
 
-  const boardOutcomes = await defaultTaskExecutor.map(
-    scope.boards,
-    { concurrency, failureMode: "isolate" },
-    async (ename) => searchBoardArticles(
-      ename,
-      keyword,
-      { author: opts.author, maxPages: opts.maxPages, maxItems: opts.maxItems },
-      repos.searchRepo,
-    ),
+  const groups = await searchBoardsGrouped(
+    scope.enames,
+    keyword,
+    { author: opts.author, maxPages: opts.maxPages, maxItems: opts.maxItems },
+    concurrency,
+    tree,
+    repos.searchRepo,
   );
 
-  const hits: Array<{ row: ArticleRow; boardEname: string }> = [];
-  for (const outcome of boardOutcomes) {
-    if (outcome.status === "success") {
-      hits.push(...(outcome.value ?? []));
-    }
-  }
+  // 展平为带 boardEname 的命中项
+  const hits: Array<{ row: ArticleRow; boardEname: string }> = groups.flatMap((group) =>
+    group.items.map((hit) => ({ row: hit.row, boardEname: group.boardEname })),
+  );
 
-  const maxThreads = opts.maxThreads ?? 20;
-  const limited = hits.slice(0, maxThreads);
+  // 限量：custom 每版 N 条；all/top 全局上限
+  const limited = scope.kind === "custom"
+    ? limitPerBoard(hits, opts.maxThreadsPerBoard ?? 2)
+    : hits.slice(0, opts.maxThreads ?? 100);
+
   const threadOutcomes = await defaultTaskExecutor.map(
     limited,
     { concurrency, failureMode: "isolate" },

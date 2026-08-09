@@ -11,7 +11,7 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { login, logout } from "../../src/auth/auth.js";
 import { fetchForumTree } from "../../src/crawl/structure/index.js";
 import { fetchTrafficUseCase } from "../../src/application/use-case/traffic/fetch-traffic-impl.js";
-import type { ForumTreeNode, BoardNode } from "../../src/models/index.js";
+import type { ForumTreeNode, BoardNode } from "../../src/model/dto/index.js";
 
 const liveEnabled = process.env.BYR_LIVE === "1";
 

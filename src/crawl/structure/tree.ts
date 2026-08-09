@@ -1,4 +1,4 @@
-import type { ForumTreeNode, Board } from "../../models/index.js";
+import type { ForumTreeNode, Board } from "../../model/dto/index.js";
 import { toSectionHtmlId } from "./id.js";
 import { extractName, extractHref, isBoardHref, isSectionHref, extractBoardEname } from "./parser.js";
 import { parseSectionDetailHtml } from "./detail.js";

@@ -3,7 +3,7 @@ import { fetchBoardArticles as fetchBoardArticlesView } from "../../../view/arti
 import type { ArticleRepository } from "../../../crawl/article/index.js";
 import { ContentDb } from "../../../storage/content-db.js";
 import { selectors } from "../../../core/config.js";
-import type { ArticleRow } from "../../../models/index.js";
+import type { ArticleRow } from "../../../model/dto/index.js";
 import type { ContentStorePort, ArticleViewPort } from "../../../model/index.js";
 
 export interface FetchBoardArticlesResult {

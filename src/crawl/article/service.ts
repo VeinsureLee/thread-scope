@@ -1,6 +1,6 @@
 import { load } from "cheerio";
 import { requireLogin } from "../../auth/auth.js";
-import type { ArticleRow } from "../../models/index.js";
+import type { ArticleRow } from "../../model/dto/index.js";
 import { paginate, parsePagination } from "../common/paginator.js";
 import { ArticleRepository, HttpArticleRepository } from "./repository.js";
 import { parseArticleList } from "./parser.js";

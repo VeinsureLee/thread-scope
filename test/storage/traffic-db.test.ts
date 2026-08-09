@@ -3,7 +3,7 @@ import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
 import { TrafficDb } from "../../src/storage/traffic-db.js";
-import type { TrafficInfo } from "../../src/models/index.js";
+import type { TrafficInfo } from "../../src/model/dto/index.js";
 
 /** 构造测试用 TrafficInfo */
 function rec(ename: string, name: string, o: string, t: string, th: string, p: string): TrafficInfo {

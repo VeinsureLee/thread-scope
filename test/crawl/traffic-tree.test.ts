@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { buildTrafficTree } from "../../src/crawl/traffic/tree.js";
-import type { ForumTreeNode, TrafficInfo } from "../../src/models/index.js";
+import type { ForumTreeNode, TrafficInfo } from "../../src/model/dto/index.js";
 
 /** 构造 board 节点 */
 function board(id: string, name: string, ename: string): ForumTreeNode {

@@ -1,4 +1,4 @@
-import type { UserProfile } from "../../models/index.js";
+import type { UserProfile } from "../../model/dto/index.js";
 import { publicUserProfile } from "./user.js";
 
 export function formatProfileLine(profile: UserProfile): string {

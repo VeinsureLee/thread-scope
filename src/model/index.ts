@@ -11,4 +11,5 @@ export * from "./thread/thread-mapper.js";
 export * from "./algorithm/common/traversal.js";
 export * from "./algorithm/forum/traffic-aggregate.js";
 export * from "./algorithm/forum/tree-index.js";
+export * from "./algorithm/forum/search-aggregate.js";
 export * from "./port/index.js";

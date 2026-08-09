@@ -10,7 +10,7 @@ import { selectors } from "../../../core/config.js";
 import { logWarn } from "../../../logging/logger.js";
 import { collectBoards, boardManagers } from "../../../model/index.js";
 import { forumRootFromLegacyTree } from "../../../model/index.js";
-import type { ArticleRow, ForumStructure, ForumTreeNode, UserProfile } from "../../../models/index.js";
+import type { ArticleRow, ForumStructure, ForumTreeNode, UserProfile } from "../../../model/dto/index.js";
 import type { ContentStorePort } from "../../../model/index.js";
 
 export interface InitStructureResult {

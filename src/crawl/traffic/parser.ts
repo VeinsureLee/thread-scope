@@ -1,6 +1,6 @@
 import { load } from "cheerio";
 import { selectors } from "../../core/config.js";
-import type { TrafficInfo } from "../../models/index.js";
+import type { TrafficInfo } from "../../model/dto/index.js";
 
 /**
  * 从 section detail HTML（带 ?count=1）中解析指定版块的流量信息。

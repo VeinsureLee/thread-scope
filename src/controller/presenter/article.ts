@@ -1,4 +1,4 @@
-import type { ArticleRow } from "../../models/index.js";
+import type { ArticleRow } from "../../model/dto/index.js";
 
 export function presentBoardArticles(result: {
   boardName: string;

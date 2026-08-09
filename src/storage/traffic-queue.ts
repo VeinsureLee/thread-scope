@@ -1,4 +1,4 @@
-import type { TrafficInfo } from "../models/index.js";
+import type { TrafficInfo } from "../model/dto/index.js";
 import { TrafficDb } from "./traffic-db.js";
 import { logError } from "../logging/logger.js";
 

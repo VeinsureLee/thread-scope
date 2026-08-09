@@ -1,6 +1,6 @@
 import { load } from "cheerio";
 import { requireLogin } from "../../auth/auth.js";
-import type { SearchResult } from "../../models/index.js";
+import type { SearchResult } from "../../model/dto/index.js";
 import { paginate, parsePagination } from "../common/paginator.js";
 import { SearchRepository, HttpSearchRepository } from "./repository.js";
 import { parseSearchResults } from "./parser.js";

@@ -21,6 +21,7 @@ export class ForumNodeMapper {
       managers: node.managers.map((m) => ({ ...m })),
       traffic: node.traffic ? { ...node.traffic } : null,
       trafficUpdatedAt: node.trafficUpdatedAt,
+      parentSectionId: node.parentSectionId,
     };
     if (node instanceof Root) {
       base.baseUrl = node.baseUrl;
@@ -41,6 +42,7 @@ export class ForumNodeMapper {
         managers: snapshot.managers,
         traffic: snapshot.traffic,
         trafficUpdatedAt: snapshot.trafficUpdatedAt,
+        parentSectionId: snapshot.parentSectionId ?? null,
       });
     }
     if (snapshot.type === "section") {
@@ -52,6 +54,7 @@ export class ForumNodeMapper {
         managers: snapshot.managers,
         traffic: snapshot.traffic,
         trafficUpdatedAt: snapshot.trafficUpdatedAt,
+        parentSectionId: snapshot.parentSectionId ?? null,
         nodes: (snapshot.nodes ?? []).map((child) => ForumNodeMapper.fromSnapshot(child)),
       });
     }
@@ -63,6 +66,7 @@ export class ForumNodeMapper {
       managers: snapshot.managers,
       traffic: snapshot.traffic,
       trafficUpdatedAt: snapshot.trafficUpdatedAt,
+      parentSectionId: snapshot.parentSectionId ?? null,
       baseUrl: snapshot.baseUrl,
       nodes: (snapshot.nodes ?? []).map((child) => ForumNodeMapper.fromSnapshot(child)),
     });

@@ -24,4 +24,4 @@ export {
 export type { FetchUserProfileResult, UpdateAllTitlesResult } from "./service.js";
 export type { UserRepository } from "./repository.js";
 export { HttpUserRepository } from "./repository.js";
-export type { User, UserProfile } from "../../models/index.js";
+export type { User, UserProfile } from "../../model/dto/index.js";

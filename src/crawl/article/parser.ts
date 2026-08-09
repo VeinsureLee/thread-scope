@@ -1,7 +1,7 @@
 import { load } from "cheerio";
 import { selectors } from "../../core/config.js";
 import { parseAuthor } from "../user/index.js";
-import type { ArticleRow } from "../../models/index.js";
+import type { ArticleRow } from "../../model/dto/index.js";
 
 /**
  * 解析版块文章列表页（/board/{ename}，element-03）。

@@ -2,7 +2,7 @@ import { load, type CheerioAPI } from "cheerio";
 import { selectors } from "../../core/config.js";
 import { parseAuthor } from "../user/index.js";
 import { uidFromHref, parsePostTime, isAnonymousWith$, isAnonSource } from "../common/parser-kit.js";
-import type { Post } from "../../models/index.js";
+import type { Post } from "../../model/dto/index.js";
 
 /**
  * 解析帖子详情页（/article/{board}/{id}，element-04/07）。

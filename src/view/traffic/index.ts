@@ -1,4 +1,5 @@
 import * as trafficCrawl from "../../crawl/traffic/index.js";
+import type { BoardNode } from "../../model/index.js";
 import type { TrafficViewPort } from "../../model/index.js";
 
 /**
@@ -9,12 +10,9 @@ import type { TrafficViewPort } from "../../model/index.js";
  */
 export function fetchSectionTraffic(
   sectionId: string,
-  refs: Parameters<typeof trafficCrawl.fetchSectionTraffic>[1],
-  errors: string[],
+  boards: readonly BoardNode[],
 ): ReturnType<typeof trafficCrawl.fetchSectionTraffic> {
-  return trafficCrawl.fetchSectionTraffic(sectionId, refs, errors);
+  return trafficCrawl.fetchSectionTraffic(sectionId, boards);
 }
 
 export const trafficView: TrafficViewPort = { fetchSectionTraffic };
-
-export type { LeafBoardRef } from "../../crawl/traffic/index.js";

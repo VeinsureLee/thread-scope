@@ -1,4 +1,4 @@
-import type { TrafficHistoryPoint } from "../../models/index.js";
+import type { TrafficHistoryPoint } from "../../model/dto/index.js";
 
 export function presentTrafficHistory(result: {
   boardEname: string;

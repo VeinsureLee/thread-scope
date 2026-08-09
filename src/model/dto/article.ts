@@ -1,8 +1,9 @@
 /**
- * 文章（article）— 版块列表页产出的文章元数据。
+ * 文章（article）DTO — 版块列表页产出的文章元数据。
  *
  * 对应 DB 表 forum-content.db 的 article 表（docs/02 §3.2）。
  * 与详情页正文（Post）分离：列表页只写 article，详情页再落 post。
+ * 对应领域层 ArticleOverview（model/thread/article-overview）的持久化形态。
  */
 export interface Article {
   /** 版块英文名（冗余，跨版面引用锚点） */

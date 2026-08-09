@@ -1,7 +1,7 @@
 import { load } from "cheerio";
 import type { AnyNode } from "domhandler";
 import { selectors } from "../../core/config.js";
-import type { Board } from "../../models/index.js";
+import type { Board } from "../../model/dto/index.js";
 import { extractName, extractHref, extractBoardEname } from "./parser.js";
 import type { AjaxEntry } from "./repository.js";
 

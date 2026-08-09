@@ -1,9 +1,8 @@
 /**
- * 版块（board），树中的叶子节点。
+ * 持久化 DTO — 版块（board）。
  *
- * 只保存基本不变的静态字段。
- * 经常变化的流量数据（帖子数、主题数、在线人数、今日发帖）由 traffic 模块
- * 实时获取，归 TrafficInfo，不存储在这里。
+ * 与领域实体 BoardNode（model/forum）区分：这是论坛结构 JSON 快照 / DB 行
+ * 的可序列化形态（docs/02 §3.1）。
  */
 export interface Board {
   name: string;
@@ -12,7 +11,7 @@ export interface Board {
   manager: string[];
 }
 
-/** 版块叶子节点 */
+/** 版块叶子节点（DTO） */
 export interface BoardNode {
   id: string;
   name: string;

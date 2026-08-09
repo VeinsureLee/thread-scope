@@ -1,4 +1,4 @@
-import type { ArticleRow, ForumTreeNode, SearchResult, ThreadDetail, TrafficInfo, TrafficTreeNode, UserProfile } from "../../models/index.js";
+import type { ArticleRow, ForumTreeNode, SearchResult, ThreadDetail, TrafficInfo, TrafficTreeNode, UserProfile } from "../../model/dto/index.js";
 
 export interface ArticleViewPort {
   fetchBoardArticles(
@@ -39,8 +39,7 @@ export interface TrafficViewPort {
   /** 读取单个 section 页面并解析其下版块流量（文档 §4.8）；跨 section 并发由 Controller 编排。 */
   fetchSectionTraffic(
     sectionId: string,
-    refs: ReadonlyArray<{ node: { board: { ename: string }; name: string }; parentSectionId: string }>,
-    errors: string[],
-  ): Promise<readonly TrafficInfo[]>;
+    boards: ReadonlyArray<{ ename: string; name: string }>,
+  ): Promise<{ readonly records: TrafficInfo[]; readonly error: string | null }>;
 }
 

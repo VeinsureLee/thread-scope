@@ -1,8 +1,9 @@
 /**
- * 帖子内容（content）— 详情页产出的正文与评论。
+ * 帖子内容（content）DTO — 详情页产出的正文与评论。
  *
  * 对应 DB 表 forum-content.db 的 post 表（docs/02 §3.3）。
  * 首帖与评论同构，共用一张 post 表，靠 kind 区分。
+ * 对应领域层 ArticleNode（model/thread/article-node）的扁平持久化形态。
  */
 
 /** 一层发言（首帖或评论） */

@@ -1,4 +1,4 @@
-import type { ForumTreeNode } from "../../models/index.js";
+import type { ForumTreeNode } from "../../model/dto/index.js";
 import { ForumRootNode } from "./forum-root-node.js";
 import { SectionNode } from "./section-node.js";
 import { BoardNode } from "./board-node.js";
@@ -22,7 +22,7 @@ export function forumRootFromLegacyTree(
   tree: readonly ForumTreeNode[],
   baseUrl = "",
 ): ForumRootNode {
-  function convert(node: ForumTreeNode): SectionNode | BoardNode {
+  function convert(node: ForumTreeNode, parentSectionId: string | null): SectionNode | BoardNode {
     if (node.type === "board") {
       return new BoardNode({
         id: node.id,
@@ -30,6 +30,7 @@ export function forumRootFromLegacyTree(
         ename: node.board.ename,
         depth: node.level,
         managers: toManagerRefs(node.board.manager),
+        parentSectionId,
       });
     }
     return new SectionNode({
@@ -37,7 +38,8 @@ export function forumRootFromLegacyTree(
       name: node.name,
       ename: null,
       depth: node.level,
-      nodes: node.children.map(convert),
+      parentSectionId,
+      nodes: node.children.map((child) => convert(child, node.id)),
     });
   }
 
@@ -47,7 +49,7 @@ export function forumRootFromLegacyTree(
     ename: null,
     depth: 0,
     baseUrl,
-    nodes: tree.map(convert),
+    nodes: tree.map((node) => convert(node, null)),
   });
   root.refreshDerivedState();
   return root;

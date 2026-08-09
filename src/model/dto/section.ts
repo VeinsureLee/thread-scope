@@ -1,9 +1,9 @@
 import type { ForumTreeNode } from "./tree.js";
 
 /**
- * 论坛结构树节点 — 分区/讨论区（branch）。
+ * 讨论区/分区节点（DTO）。
  *
- * type: "section" → 可包含子分区或版块
+ * 与领域实体 SectionNode（model/forum）区分：这是结构 JSON 快照的可序列化形态。
  */
 export interface SectionNode {
   id: string;
