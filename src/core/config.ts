@@ -192,6 +192,19 @@ export const MAX_CONCURRENCY = http.concurrency.max;
 /** 用户资料 TTL（小时，docs/06 §5.3） */
 export const USER_PROFILE_TTL_HOURS = http.user.profile_ttl_hours;
 
+// ════════════════════════════════════════════════════════════
+// 搜索默认上限（docs 搜索优化：结果过多时截断 + truncated 信号）
+// ════════════════════════════════════════════════════════════
+
+/** 搜索文章：全局返回上限（默认；maxResults 覆盖） */
+export const DEFAULT_SEARCH_MAX_RESULTS = 100;
+/** 搜索文章：每版返回上限（默认；maxItems 覆盖） */
+export const DEFAULT_SEARCH_PER_BOARD = 20;
+/** 搜索帖子：全局返回上限（默认；maxThreads 覆盖） */
+export const DEFAULT_SEARCH_MAX_THREADS = 50;
+/** 搜索帖子：每版返回上限（默认；maxThreadsPerBoard 覆盖） */
+export const DEFAULT_SEARCH_PER_BOARD_THREADS = 10;
+
 // ============================================================
 // 3. 通用规则 — 日志
 // ============================================================

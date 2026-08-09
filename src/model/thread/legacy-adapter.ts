@@ -26,6 +26,8 @@ function toArticleNode(post: Post, articleId: string, title: string | null, dept
     replyDepth: depth,
     images: post.images,
     postedAt: post.postTime,
+    client: post.client ?? null,
+    ip: post.ip ?? null,
   });
 }
 

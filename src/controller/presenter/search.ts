@@ -7,6 +7,9 @@ interface ArticleGroup {
   items: readonly ArticleRow[];
 }
 
+const TRUNCATED_HINT =
+  "⚠ 结果过多已截断：还有更多未返回。可传 boards 缩小范围、from/to 限定时间、或换更精确关键词。";
+
 export function presentArticleSearch(result: {
   source: "local" | "remote";
   keyword?: string;
@@ -14,6 +17,7 @@ export function presentArticleSearch(result: {
   scope?: { label: string };
   total: number;
   boards: readonly ArticleGroup[];
+  truncated?: boolean;
   elapsedMs: number;
 }): { text: string; data: object } {
   const lines = [
@@ -24,6 +28,9 @@ export function presentArticleSearch(result: {
     `用时: ${result.source === "local" ? `${result.elapsedMs}ms` : `${(result.elapsedMs / 1000).toFixed(1)}s`}`,
     "",
   ];
+  if (result.truncated) {
+    lines.push(TRUNCATED_HINT, "");
+  }
   for (const group of result.boards) {
     lines.push(`[${group.boardEname}] ${group.count} 条命中:`);
     lines.push(
@@ -48,6 +55,7 @@ export function presentThreadSearch(result: {
     authorRaw: string;
     content: string;
   }>;
+  truncated?: boolean;
   elapsedMs: number;
 }): { text: string; data: object } {
   const lines = [
@@ -58,10 +66,13 @@ export function presentThreadSearch(result: {
     `用时: ${result.source === "local" ? `${result.elapsedMs}ms` : `${(result.elapsedMs / 1000).toFixed(1)}s`}`,
     "",
   ];
+  if (result.truncated) {
+    lines.push(TRUNCATED_HINT, "");
+  }
   if (result.source === "local") {
     lines.push(
       ...result.localHits.map((hit) =>
-        `[${hit.boardEname}] ${hit.articleTitle} #${hit.floor} (${hit.authorRaw}): ${hit.content.slice(0, 80)}`,
+        `[${hit.boardEname}] ${hit.articleTitle} #${hit.floor} (${hit.authorRaw}): ${hit.content.slice(0, 40)}`,
       ),
     );
   } else {

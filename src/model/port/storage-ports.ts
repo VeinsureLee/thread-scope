@@ -48,12 +48,32 @@ export interface LocalThreadSearchHit {
   authorRaw: string;
   content: string;
   postTime: string | null;
+  /** 客户端类型（"手机客户端" | "网页" | null） */
+  client?: string | null;
+  /** 来源 IP（匿名 → null） */
+  ip?: string | null;
+}
+
+/** 本地内容搜索选项（限制版面/时间窗口/上限/排序）。 */
+export interface SearchContentOptions {
+  /** 限定单版面（兼容旧调用） */
+  boardEname?: string;
+  /** 限定多版面 */
+  boardEnames?: readonly string[];
+  /** 发帖日期/时间下界（YYYY-MM-DD 或 ISO datetime） */
+  from?: string;
+  /** 发帖日期/时间上界 */
+  to?: string;
+  /** 返回上限 */
+  limit?: number;
+  /** recent=时效(默认) / relevant=相关性 */
+  sort?: "recent" | "relevant";
 }
 
 export interface ContentStorePort extends ThreadStorePort, UserStorePort {
   close?(): void;
-  searchArticles(keyword: string, options?: { boardEname?: string; limit?: number }): ArticleRow[];
-  searchThreadsContent(keyword: string, options?: { boardEname?: string; limit?: number }): LocalThreadSearchHit[];
+  searchArticles(keyword: string, options?: SearchContentOptions): ArticleRow[];
+  searchThreadsContent(keyword: string, options?: SearchContentOptions): LocalThreadSearchHit[];
   setUserManager(uid: string): void;
 }
 

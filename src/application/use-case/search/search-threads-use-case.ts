@@ -1,8 +1,10 @@
 import { ContentDb } from "../../../storage/content-db.js";
-import { selectors } from "../../../core/config.js";
+import { selectors, DEFAULT_SEARCH_MAX_THREADS, DEFAULT_SEARCH_PER_BOARD_THREADS } from "../../../core/config.js";
 import type { SearchThreadHit } from "../../../model/dto/index.js";
 import { searchThreads, type SearchThreadsOptions } from "./search-threads.js";
 import { limitPerBoard } from "../../../model/index.js";
+import { resolveSearchBoards } from "./resolve-search-boards.js";
+import { fetchForumTree } from "../../../view/structure/index.js";
 import type { ContentStorePort, LocalThreadSearchHit } from "../../../model/index.js";
 
 type LocalThreadHit = LocalThreadSearchHit;
@@ -23,6 +25,8 @@ export type SearchThreadsUseCaseResult =
       readonly scope?: Awaited<ReturnType<typeof searchThreads>>["scope"];
       readonly hits: readonly SearchThreadHit[];
       readonly localHits: readonly LocalThreadHit[];
+      /** 结果过多被截断（可用 boards/from/to/关键词进一步收敛） */
+      readonly truncated: boolean;
       readonly elapsedMs: number;
     }
   | { readonly kind: "invalid"; readonly message: string };
@@ -66,19 +70,41 @@ export async function searchThreadsUseCase(
     const startedAt = Date.now();
     const db = options.store ?? new ContentDb();
     try {
-      let localHits = db.searchThreadsContent(keyword, { limit: options.maxThreads ?? 100 });
-      // 显式多版时每版限流；否则全局上限
-      const explicitBoards = Array.isArray(options.boards)
-        ? options.boards.length > 0
-        : typeof options.boards === "string" && options.boards.trim().length > 0;
-      if (explicitBoards) localHits = limitPerBoard(localHits, options.maxThreadsPerBoard ?? 2);
-      if (localHits.length > 0 || source === "local") {
+      const maxThreads = options.maxThreads ?? DEFAULT_SEARCH_MAX_THREADS;
+      const perBoard = options.maxThreadsPerBoard ?? DEFAULT_SEARCH_PER_BOARD_THREADS;
+
+      // 本地搜索也按 boards 收敛（all 时不加过滤，避免冗余 IN）
+      let boardEnames: string[] | undefined;
+      if (options.boards) {
+        const tree = options.tree ?? (await fetchForumTree());
+        const scope = resolveSearchBoards(tree, options.boards);
+        if (scope.kind !== "all") boardEnames = scope.enames;
+      }
+
+      // 多取 1 条探测截断
+      const rows = db.searchThreadsContent(keyword, {
+        boardEnames,
+        from: options.from,
+        to: options.to,
+        sort: options.sort,
+        limit: maxThreads + 1,
+      });
+
+      const rawTruncated = rows.length > maxThreads;
+      const boardCounts = new Map<string, number>();
+      for (const row of rows) boardCounts.set(row.boardEname, (boardCounts.get(row.boardEname) ?? 0) + 1);
+      const perBoardTruncated = [...boardCounts.values()].some((c) => c > perBoard);
+
+      const localHits = limitPerBoard(rows, perBoard).slice(0, maxThreads);
+
+      if (rows.length > 0 || source === "local") {
         return {
           kind: "results",
           source: "local",
           keyword,
           localHits,
           hits: [],
+          truncated: rawTruncated || perBoardTruncated,
           elapsedMs: Date.now() - startedAt,
         };
       }
@@ -99,6 +125,7 @@ export async function searchThreadsUseCase(
     scope: result.scope,
     hits,
     localHits: [],
+    truncated: result.truncated,
     elapsedMs: Date.now() - startedAt,
   };
 }

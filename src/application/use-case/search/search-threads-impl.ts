@@ -5,7 +5,7 @@ import { articleIdFromUrl, boardFromArticleUrl } from "../../../crawl/article/in
 import { searchBoardsGrouped } from "./search-boards.js";
 import { resolveSearchBoards, type ResolvedSearchScope } from "./resolve-search-boards.js";
 import { defaultTaskExecutor } from "../../execution/async-task-executor.js";
-import { DEFAULT_CONCURRENCY } from "../../../core/config.js";
+import { DEFAULT_CONCURRENCY, DEFAULT_SEARCH_MAX_THREADS, DEFAULT_SEARCH_PER_BOARD_THREADS } from "../../../core/config.js";
 import { fetchForumTree } from "../../../view/structure/index.js";
 import type { SearchRepository } from "../../../crawl/search/index.js";
 import type { ThreadRepository } from "../../../crawl/content/index.js";
@@ -16,13 +16,19 @@ export interface SearchThreadsOptions {
   author?: string;
   maxPages?: number;
   maxItems?: number;
-  /** 显式 boards（custom）时每版最多抓取 N 条，默认 2。 */
+  /** 显式 boards（custom）时每版最多抓取 N 条，默认 10。 */
   maxThreadsPerBoard?: number;
-  /** all/top 大范围时的全局抓取上限，默认 100。 */
+  /** all/top 大范围时的全局抓取上限，默认 50。 */
   maxThreads?: number;
   maxThreadPages?: number;
   concurrency?: number;
   tree?: ForumTreeNode[];
+  /** 发帖时间下界（仅本地路径生效） */
+  from?: string;
+  /** 发帖时间上界（仅本地路径生效） */
+  to?: string;
+  /** 排序：recent=时效(默认) / relevant=相关性（仅本地路径生效） */
+  sort?: "recent" | "relevant";
 }
 
 export interface SearchThreadsRepositories {
@@ -43,7 +49,7 @@ export async function searchThreads(
   keyword: string,
   opts: SearchThreadsOptions = {},
   repos: SearchThreadsRepositories = {},
-): Promise<{ scope: ResolvedSearchScope; hits: SearchThreadHit[] }> {
+): Promise<{ scope: ResolvedSearchScope; hits: SearchThreadHit[]; truncated: boolean }> {
   requireLogin();
 
   const tree = opts.tree ?? (await fetchForumTree());
@@ -64,10 +70,11 @@ export async function searchThreads(
     group.items.map((hit) => ({ row: hit.row, boardEname: group.boardEname })),
   );
 
-  // 限量：custom 每版 N 条；all/top 全局上限
+  // 限量：custom 每版 N 条；all/top 全局上限。truncated 标记"搜索结果多于返回数"。
   const limited = scope.kind === "custom"
-    ? limitPerBoard(hits, opts.maxThreadsPerBoard ?? 2)
-    : hits.slice(0, opts.maxThreads ?? 100);
+    ? limitPerBoard(hits, opts.maxThreadsPerBoard ?? DEFAULT_SEARCH_PER_BOARD_THREADS)
+    : hits.slice(0, opts.maxThreads ?? DEFAULT_SEARCH_MAX_THREADS);
+  const truncated = hits.length > limited.length;
 
   const threadOutcomes = await defaultTaskExecutor.map(
     limited,
@@ -103,6 +110,7 @@ export async function searchThreads(
 
   return {
     scope,
+    truncated,
     hits: threadOutcomes
       .filter((outcome): outcome is typeof outcome & { status: "success"; value: SearchThreadHit } => outcome.status === "success")
       .map((outcome) => outcome.value),

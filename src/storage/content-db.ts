@@ -1,6 +1,9 @@
 import { createHash } from "crypto";
 import { DatabaseSync } from "node:sqlite";
 import { openDb, transaction } from "./db-common.js";
+import { logWarn } from "../logging/logger.js";
+import { segmentBigrams, ftsPhraseQuery, shouldUseFts } from "./fts-bigrams.js";
+import { parsePostContent } from "../crawl/common/parse-post-content.js";
 import type { ArticleRow, Post } from "../model/dto/index.js";
 import type { Thread } from "../model/index.js";
 import { flattenArticleNodes } from "./mapper/thread-mapper.js";
@@ -82,7 +85,6 @@ const MIGRATIONS = [
     follow_num          INTEGER NOT NULL DEFAULT 0,
     fans_num            INTEGER NOT NULL DEFAULT 0,
     is_manager          BOOLEAN NOT NULL DEFAULT 0,
-    profile             TEXT,
     profile_fetched_at  TEXT,
     updated_at          TEXT
   );
@@ -138,11 +140,17 @@ const MIGRATIONS = [
  */
 export class ContentDb {
   private db: DatabaseSync;
+  /** FTS5 是否可用（初始化失败时回退 LIKE 搜索） */
+  private ftsEnabled = false;
 
   constructor(dbPath?: string) {
     this.db = openDb(dbPath ?? "forum-content.db", MIGRATIONS);
     this.ensureUserColumns();
     this.ensureArticleColumns();
+    this.ensurePostColumns();
+    this.ensureFtsIndexes();
+    this.cleanLegacyPosts();
+    this.dropLegacyProfileColumn();
   }
 
   /**
@@ -178,7 +186,6 @@ export class ContentDb {
       ["follow_num", "INTEGER NOT NULL DEFAULT 0"],
       ["fans_num", "INTEGER NOT NULL DEFAULT 0"],
       ["is_manager", "BOOLEAN NOT NULL DEFAULT 0"],
-      ["profile", "TEXT"],
       ["profile_fetched_at", "TEXT"],
       ["updated_at", "TEXT"],
     ];
@@ -189,9 +196,24 @@ export class ContentDb {
     }
     // is_manager 索引（需列存在才建）
     this.db.exec(`CREATE INDEX IF NOT EXISTS idx_user_is_manager ON user (is_manager);`);
+  }
 
-    // 旧数据迁移：profile JSON → 独立字段（仅当 profile 列有值且关键字段为空时）
+  /**
+   * 删除历史遗留的 user.profile JSON 列。
+   *
+   * profile 拆成独立字段后该列已无写入（upsertUser/upsertUserProfile 只写独立列，
+   * getUserProfile 从独立列组装）；仅有旧数据残留。先 migrateProfileJson 把旧 JSON
+   * 拆进独立列，再 DROP COLUMN。幂等：列不存在时跳过。
+   */
+  private dropLegacyProfileColumn(): void {
+    const cols = this.db
+      .prepare(`PRAGMA table_info(user)`)
+      .all() as unknown as Array<{ name: string }>;
+    const hasProfile = cols.some((c) => c.name === "profile");
+    if (!hasProfile) return;
+    // 旧 JSON → 独立列（须在 DROP 前完成）
     this.migrateProfileJson();
+    this.db.exec(`ALTER TABLE user DROP COLUMN profile;`);
   }
 
   /** 文章概览字段迁移（幂等），兼容早期只保存标题/URL 的 article 表。 */
@@ -210,6 +232,116 @@ export class ContentDb {
       if (!existing.has(name)) this.db.exec(`ALTER TABLE article ADD COLUMN ${name} ${type};`);
     }
     this.db.exec(`CREATE INDEX IF NOT EXISTS idx_article_last_reply ON article (last_reply);`);
+  }
+
+  /** post 表补充列迁移（幂等）：client / ip（帖子正文清洗后提取的字段）。 */
+  private ensurePostColumns(): void {
+    const cols = this.db
+      .prepare(`PRAGMA table_info(post)`)
+      .all() as unknown as Array<{ name: string }>;
+    const existing = new Set(cols.map((c) => c.name));
+    const newColumns: Array<[string, string]> = [
+      ["client", "TEXT"],
+      ["ip", "TEXT"],
+    ];
+    for (const [name, type] of newColumns) {
+      if (!existing.has(name)) this.db.exec(`ALTER TABLE post ADD COLUMN ${name} ${type};`);
+    }
+  }
+
+  // ════════════════ FTS5 全文索引（bigram 预切分，见 fts-bigrams.ts） ════════════════
+
+  /**
+   * 初始化 FTS5 虚拟表（article_fts / post_fts）+ 存量回填。
+   *
+   * 表为空时从基表回填 bigram；后续增量由写路径 syncArticleFts/syncPostFts 维护。
+   * 失败不致命：FTS 只是加速/排序加速器，回退 LIKE 仍保证正确性。
+   */
+  private ensureFtsIndexes(): void {
+    try {
+      this.db.exec(`CREATE VIRTUAL TABLE IF NOT EXISTS article_fts USING fts5(title_tok)`);
+      this.db.exec(`CREATE VIRTUAL TABLE IF NOT EXISTS post_fts USING fts5(content_tok)`);
+
+      const articleCount = (this.db.prepare(`SELECT count(*) AS c FROM article_fts`).get() as { c: number }).c;
+      if (articleCount === 0) {
+        const rows = this.db.prepare(`SELECT id, title FROM article`).all() as Array<{ id: number; title: string }>;
+        const insert = this.db.prepare(`INSERT INTO article_fts(rowid, title_tok) VALUES (?, ?)`);
+        transaction(this.db, () => {
+          for (const row of rows) insert.run(row.id, segmentBigrams(row.title));
+        });
+      }
+
+      const postCount = (this.db.prepare(`SELECT count(*) AS c FROM post_fts`).get() as { c: number }).c;
+      if (postCount === 0) this.backfillPostFts();
+
+      this.ftsEnabled = true;
+    } catch (err) {
+      logWarn("system", { message: "FTS5 初始化失败，搜索回退 LIKE", error: (err as Error).message }, "db.fts");
+      this.ftsEnabled = false;
+    }
+  }
+
+  /** 重建 post_fts（从 post 表全部正文重灌 bigram）。调用方需确认 FTS 可用。 */
+  private backfillPostFts(): void {
+    this.db.exec(`DELETE FROM post_fts`);
+    const rows = this.db.prepare(`SELECT id, content FROM post`).all() as Array<{ id: number; content: string }>;
+    const insert = this.db.prepare(`INSERT INTO post_fts(rowid, content_tok) VALUES (?, ?)`);
+    transaction(this.db, () => {
+      for (const row of rows) insert.run(row.id, segmentBigrams(row.content));
+    });
+  }
+
+  /**
+   * 旧帖正文清洗迁移（幂等）。
+   *
+   * 早期帖子 content 存整块原始文本（含"发信人:/标题/发信站"头部与"--/来源"尾部），
+   * 会污染 FTS 分词。检测到仍带"发信人:"头的帖子时，逐行 parsePostContent 清洗
+   * content/client/ip，并重建 post_fts 索引。清洗后无脏帖 → 直接跳过（幂等）。
+   */
+  private cleanLegacyPosts(): void {
+    const dirty = this.db
+      .prepare(`SELECT count(*) AS c FROM post WHERE content LIKE '发信人:%'`)
+      .get() as { c: number };
+    if (!dirty.c) return;
+
+    const rows = this.db
+      .prepare(`SELECT id, content FROM post WHERE content LIKE '发信人:%'`)
+      .all() as Array<{ id: number; content: string }>;
+    const update = this.db.prepare(
+      `UPDATE post SET content = ?, client = ?, ip = ?,
+         post_time = CASE WHEN ? IS NOT NULL THEN ? ELSE post_time END
+       WHERE id = ?`,
+    );
+    transaction(this.db, () => {
+      for (const row of rows) {
+        const parsed = parsePostContent(row.content);
+        update.run(parsed.body, parsed.client, parsed.ip, parsed.postTime, parsed.postTime, row.id);
+      }
+    });
+
+    // 清洗后正文变了 → 重建正文索引
+    if (this.ftsEnabled) this.backfillPostFts();
+  }
+
+  /** 同步单篇文章标题到 article_fts（写路径挂点）。 */
+  private syncArticleFts(id: number, title: string): void {
+    if (!this.ftsEnabled) return;
+    this.db.prepare(`DELETE FROM article_fts WHERE rowid = ?`).run(id);
+    this.db.prepare(`INSERT INTO article_fts(rowid, title_tok) VALUES (?, ?)`).run(id, segmentBigrams(title));
+  }
+
+  /** 同步一批帖子正文到 post_fts（写路径挂点；按 article_id+kind+floor 定位 post id）。 */
+  private syncPostFts(articleId: number, posts: Array<{ floor: number; kind: string; content: string }>): void {
+    if (!this.ftsEnabled) return;
+    const findId = this.db.prepare(`SELECT id FROM post WHERE article_id = ? AND kind = ? AND floor = ?`);
+    const del = this.db.prepare(`DELETE FROM post_fts WHERE rowid = ?`);
+    const ins = this.db.prepare(`INSERT INTO post_fts(rowid, content_tok) VALUES (?, ?)`);
+    for (const post of posts) {
+      const row = findId.get(articleId, post.kind, post.floor) as { id: number } | undefined;
+      if (!row) continue;
+      del.run(row.id);
+      ins.run(row.id, segmentBigrams(post.content));
+    }
   }
 
   /** 旧 user.profile JSON → 独立字段（幂等：关键字段已填则跳过） */
@@ -442,16 +574,19 @@ export class ContentDb {
     const row = this.db
       .prepare(`SELECT id FROM article WHERE url_hash = ?`)
       .get(urlHash) as { id: number } | undefined;
+    if (row) this.syncArticleFts(row.id, article.title);
     return row ? row.id : 0;
   }
 
-  /** 批量 upsert 文章（列表页一批） */
+  /** 批量 upsert 文章（列表页一批；单事务摊薄 FTS 写 fsync） */
   upsertArticles(articles: ArticleRow[]): number {
-    let inserted = 0;
-    for (const a of articles) {
-      if (this.upsertArticle(a) > 0) inserted++;
-    }
-    return inserted;
+    return transaction(this.db, () => {
+      let inserted = 0;
+      for (const a of articles) {
+        if (this.upsertArticle(a) > 0) inserted++;
+      }
+      return inserted;
+    });
   }
 
   /**
@@ -486,12 +621,13 @@ export class ContentDb {
         .get(urlHash) as { id: number } | undefined;
       if (!articleRow) return 0;
       const articleId = articleRow.id;
+      this.syncArticleFts(articleId, articleMeta.title);
 
       // 3. posts
       const insertPost = this.db.prepare(
         `INSERT OR IGNORE INTO post
-           (article_id, parent_id, floor, kind, author_uid, author_raw, is_anon, content, images, post_time, crawled_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+           (article_id, parent_id, floor, kind, author_uid, author_raw, is_anon, content, images, post_time, client, ip, crawled_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       );
       for (const p of [firstPost, ...replies]) {
         insertPost.run(
@@ -505,9 +641,13 @@ export class ContentDb {
           p.content,
           JSON.stringify(p.images),
           p.postTime,
+          p.client ?? null,
+          p.ip ?? null,
           now,
         );
       }
+
+      this.syncPostFts(articleId, [firstPost, ...replies]);
 
       return articleId;
     });
@@ -584,13 +724,14 @@ export class ContentDb {
         .prepare(`SELECT id FROM article WHERE url_hash = ?`)
         .get(urlHash) as { id: number } | undefined;
       if (!articleRow) return 0;
+      this.syncArticleFts(articleRow.id, overview.title);
 
       const postIds = new Map<string, number>();
       const insertPost = this.db.prepare(
         `INSERT INTO post
            (article_id, parent_id, floor, kind, author_uid, author_raw, is_anon,
-            content, images, post_time, crawled_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            content, images, post_time, client, ip, crawled_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
          ON CONFLICT(article_id, kind, floor) DO UPDATE SET
            parent_id = excluded.parent_id,
            author_uid = excluded.author_uid,
@@ -599,6 +740,8 @@ export class ContentDb {
            content = excluded.content,
            images = excluded.images,
            post_time = excluded.post_time,
+           client = excluded.client,
+           ip = excluded.ip,
            crawled_at = excluded.crawled_at`,
       );
       for (const node of nodes) {
@@ -614,6 +757,8 @@ export class ContentDb {
           node.content,
           JSON.stringify(node.images),
           node.postedAt,
+          node.client ?? null,
+          node.ip ?? null,
           now,
         );
         const postRow = this.db
@@ -621,6 +766,10 @@ export class ContentDb {
           .get(articleRow.id, node.kind, node.forumFloor) as { id: number } | undefined;
         if (postRow) postIds.set(node.id, postRow.id);
       }
+      this.syncPostFts(
+        articleRow.id,
+        nodes.map((n) => ({ floor: n.forumFloor, kind: n.kind, content: n.content })),
+      );
       return articleRow.id;
     });
   }
@@ -909,37 +1058,95 @@ export class ContentDb {
   // ════════════ 本地搜索（缓存命中：先查库，再决定是否联网） ════════════
 
   /**
-   * 本地搜索文章（article 表，标题 LIKE 匹配）。
+   * 本地搜索文章（article 表标题；优先 FTS5 bigram 索引，短词回退 LIKE）。
    *
    * 缓存命中路径：之前搜索/抓取落库过的文章，从这里秒回，无需联网、无需登录。
    *
-   * @param keyword 关键字（LIKE 通配符自动包裹，大小写不敏感）
-   * @param opts    { boardEname? 限定版面；limit? 返回上限 }
+   * @param keyword 关键字（FTS 短语匹配 + LIKE 兜底，大小写不敏感）
+   * @param opts    { boardEnames?/boardEname? 限定版面；from?/to? 发帖日期窗口；
+   *                 sort? recent/relevant；limit? 返回上限 }
    * @returns 命中文章行（含版块/标题/url/作者/日期/回复数）
    */
   searchArticles(
     keyword: string,
-    opts: { boardEname?: string; limit?: number } = {},
+    opts: {
+      /** 限定单版面（兼容旧调用） */
+      boardEname?: string;
+      /** 限定多版面 */
+      boardEnames?: readonly string[];
+      /** 发帖日期下界（YYYY-MM-DD / ISO datetime） */
+      from?: string;
+      /** 发帖日期上界 */
+      to?: string;
+      /** 返回上限 */
+      limit?: number;
+      /** recent=时效(默认) / relevant=相关性(bm25；LIKE 回退时退化为前缀优先) */
+      sort?: "recent" | "relevant";
+    } = {},
   ): ArticleRow[] {
-    let sql = `
+    const { from, to, limit, sort = "recent" } = opts;
+    const boards = opts.boardEnames && opts.boardEnames.length > 0
+      ? [...opts.boardEnames]
+      : opts.boardEname
+        ? [opts.boardEname]
+        : [];
+    const useFts = shouldUseFts(keyword) && this.ftsEnabled;
+
+    const select = `
       SELECT a.board_ename, a.title, a.url, u.name AS author_raw,
              u.uid AS author_uid, a.is_pinned, a.date, a.reply_count,
              a.last_reply, u2.uid AS last_replier_uid, a.crawled_at
-      FROM article a
-      LEFT JOIN user u ON u.id = a.author_uid
-      LEFT JOIN user u2 ON u2.id = a.last_replier_uid
-      WHERE a.title LIKE ?
     `;
-    const params: (string | number)[] = [`%${keyword}%`];
-    if (opts.boardEname) {
-      sql += ` AND a.board_ename = ?`;
-      params.push(opts.boardEname);
+    const params: (string | number)[] = [];
+
+    // FTS 路径：bigram 候选集 + LIKE 兜底（只在 FTS 命中的行上跑，保证正确性）。
+    // bm25/rank 等 FTS 辅助函数须用 FTS 真实表名（不能用别名）。
+    let sql: string;
+    if (useFts) {
+      sql = `${select}
+        FROM article_fts
+        JOIN article a ON a.id = article_fts.rowid
+        LEFT JOIN user u ON u.id = a.author_uid
+        LEFT JOIN user u2 ON u2.id = a.last_replier_uid
+        WHERE article_fts MATCH ?
+          AND a.title LIKE ?`;
+      params.push(ftsPhraseQuery(keyword)!, `%${keyword}%`);
+    } else {
+      sql = `${select}
+        FROM article a
+        LEFT JOIN user u ON u.id = a.author_uid
+        LEFT JOIN user u2 ON u2.id = a.last_replier_uid
+        WHERE a.title LIKE ?`;
+      params.push(`%${keyword}%`);
     }
-    sql += ` ORDER BY a.crawled_at DESC`;
-    if (opts.limit) {
+
+    if (boards.length > 0) {
+      sql += ` AND a.board_ename IN (${boards.map(() => "?").join(", ")})`;
+      params.push(...boards);
+    }
+    if (from) {
+      sql += ` AND a.date >= ?`;
+      params.push(from);
+    }
+    if (to) {
+      sql += ` AND a.date <= ?`;
+      params.push(to);
+    }
+
+    if (sort === "relevant" && useFts) {
+      sql += ` ORDER BY bm25(article_fts) ASC`;
+    } else if (sort === "relevant") {
+      sql += ` ORDER BY CASE WHEN a.title LIKE ? THEN 0 ELSE 1 END, a.date DESC, a.id DESC`;
+      params.push(`${keyword}%`);
+    } else {
+      sql += ` ORDER BY a.is_pinned DESC, a.date DESC, a.id DESC`;
+    }
+
+    if (limit) {
       sql += ` LIMIT ?`;
-      params.push(opts.limit);
+      params.push(limit);
     }
+
     const rows = this.db.prepare(sql).all(...params) as unknown as Array<{
       board_ename: string;
       title: string;
@@ -968,17 +1175,31 @@ export class ContentDb {
   }
 
   /**
-   * 本地搜索帖子正文（post 表，content LIKE 匹配）。
+   * 本地搜索帖子正文（post 表内容；优先 FTS5 bigram 索引，短词回退 LIKE）。
    *
    * 缓存命中路径：之前抓取落库过的帖子正文，从这里秒回。
    *
-   * @param keyword 关键字
-   * @param opts    { boardEname? 限定版面；limit? 返回上限 }
+   * @param keyword 关键字（FTS 短语匹配 + LIKE 兜底）
+   * @param opts    { boardEnames?/boardEname? 限定版面；from?/to? 发帖时间窗口；
+   *                 sort? recent/relevant；limit? 返回上限 }
    * @returns 命中楼层（含所属文章标题/url、楼层号、正文、作者）
    */
   searchThreadsContent(
     keyword: string,
-    opts: { boardEname?: string; limit?: number } = {},
+    opts: {
+      /** 限定单版面（兼容旧调用） */
+      boardEname?: string;
+      /** 限定多版面 */
+      boardEnames?: readonly string[];
+      /** 发帖时间下界（YYYY-MM-DD / ISO datetime） */
+      from?: string;
+      /** 发帖时间上界 */
+      to?: string;
+      /** 返回上限 */
+      limit?: number;
+      /** recent=时效(默认) / relevant=相关性(bm25；LIKE 回退时退化为前缀优先) */
+      sort?: "recent" | "relevant";
+    } = {},
   ): Array<{
     boardEname: string;
     articleTitle: string;
@@ -989,23 +1210,64 @@ export class ContentDb {
     content: string;
     postTime: string | null;
   }> {
-    let sql = `
+    const { from, to, limit, sort = "recent" } = opts;
+    const boards = opts.boardEnames && opts.boardEnames.length > 0
+      ? [...opts.boardEnames]
+      : opts.boardEname
+        ? [opts.boardEname]
+        : [];
+    const useFts = shouldUseFts(keyword) && this.ftsEnabled;
+
+    const select = `
       SELECT a.board_ename, a.title AS article_title, a.url AS article_url,
-             p.floor, p.kind, p.author_raw, p.content, p.post_time
-      FROM post p
-      JOIN article a ON a.id = p.article_id
-      WHERE p.content LIKE ?
+             p.floor, p.kind, p.author_raw, p.content, p.post_time, p.client, p.ip
     `;
-    const params: (string | number)[] = [`%${keyword}%`];
-    if (opts.boardEname) {
-      sql += ` AND a.board_ename = ?`;
-      params.push(opts.boardEname);
+    const params: (string | number)[] = [];
+
+    let sql: string;
+    if (useFts) {
+      sql = `${select}
+        FROM post_fts
+        JOIN post p ON p.id = post_fts.rowid
+        JOIN article a ON a.id = p.article_id
+        WHERE post_fts MATCH ?
+          AND p.content LIKE ?`;
+      params.push(ftsPhraseQuery(keyword)!, `%${keyword}%`);
+    } else {
+      sql = `${select}
+        FROM post p
+        JOIN article a ON a.id = p.article_id
+        WHERE p.content LIKE ?`;
+      params.push(`%${keyword}%`);
     }
-    sql += ` ORDER BY p.crawled_at DESC`;
-    if (opts.limit) {
+
+    if (boards.length > 0) {
+      sql += ` AND a.board_ename IN (${boards.map(() => "?").join(", ")})`;
+      params.push(...boards);
+    }
+    if (from) {
+      sql += ` AND p.post_time >= ?`;
+      params.push(from);
+    }
+    if (to) {
+      sql += ` AND p.post_time <= ?`;
+      params.push(to);
+    }
+
+    if (sort === "relevant" && useFts) {
+      sql += ` ORDER BY bm25(post_fts) ASC`;
+    } else if (sort === "relevant") {
+      sql += ` ORDER BY CASE WHEN p.content LIKE ? THEN 0 ELSE 1 END, p.post_time DESC, p.id DESC`;
+      params.push(`${keyword}%`);
+    } else {
+      sql += ` ORDER BY p.post_time DESC, p.id DESC`;
+    }
+
+    if (limit) {
       sql += ` LIMIT ?`;
-      params.push(opts.limit);
+      params.push(limit);
     }
+
     const rows = this.db.prepare(sql).all(...params) as unknown as Array<{
       board_ename: string;
       article_title: string;
@@ -1015,6 +1277,8 @@ export class ContentDb {
       author_raw: string;
       content: string;
       post_time: string | null;
+      client: string | null;
+      ip: string | null;
     }>;
     return rows.map((r) => ({
       boardEname: r.board_ename,
@@ -1025,6 +1289,8 @@ export class ContentDb {
       authorRaw: r.author_raw,
       content: r.content,
       postTime: r.post_time,
+      client: r.client,
+      ip: r.ip,
     }));
   }
 

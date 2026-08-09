@@ -1,5 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import * as fs from "fs";
+import * as os from "os";
+import * as path from "path";
 import { saveCookie, clearCookie } from "../../src/core/http-client.js";
+import { ContentDb } from "../../src/storage/content-db.js";
 import { searchBoardsGrouped } from "../../src/application/use-case/search/search-boards.js";
 import { searchArticlesUseCase } from "../../src/application/use-case/search/search-articles-use-case.js";
 import type { SearchRepository } from "../../src/crawl/search/index.js";
@@ -68,7 +72,7 @@ describe("searchBoardsGrouped（按版分组并发搜索）", () => {
 });
 
 describe("searchArticlesUseCase（本地路径按版分组）", () => {
-  it("local 搜索返回分组结构 total + boards", async () => {
+  it("local 搜索返回按版分组结构（total + boards）", async () => {
     const result = await searchArticlesUseCase({
       keyword: "示例",
       source: "local",
@@ -78,8 +82,56 @@ describe("searchArticlesUseCase（本地路径按版分组）", () => {
     expect(result.kind).toBe("results");
     if (result.kind !== "results") return;
     expect(result.source).toBe("local");
-    // 无本地数据时 local 返回空
-    expect(result.total).toBe(0);
-    expect(result.boards).toEqual([]);
+    // 分组结构契约（不依赖真实库内容）：total 为数字，boards 为分组数组，每组含 boardEname/count/items
+    expect(typeof result.total).toBe("number");
+    expect(Array.isArray(result.boards)).toBe(true);
+    for (const group of result.boards) {
+      expect(typeof group.boardEname).toBe("string");
+      expect(typeof group.count).toBe("number");
+      expect(Array.isArray(group.items)).toBe(true);
+      expect(group.items.length).toBe(group.count);
+    }
+  });
+
+  it("local 搜索：maxResults/每版上限截断 + truncated 信号 + boards 过滤", async () => {
+    const tmpFile = path.join(os.tmpdir(), `search-articles-${process.pid}-${Math.random().toString(36).slice(2)}.db`);
+    const db = new ContentDb(tmpFile);
+    try {
+      db.upsertBoard("Demo", "示例甲", false);
+      db.upsertBoard("Other", "示例乙", false);
+      for (let i = 1; i <= 5; i++) {
+        db.upsertArticle({
+          boardEname: "Demo", title: `示例标题${i}`, url: `/article/Demo/${i}`,
+          date: "2026-01-01", isPinned: false, authorUid: null, authorRaw: "u",
+          replyCount: 0, lastReply: "", lastReplierUid: null,
+        });
+        db.upsertArticle({
+          boardEname: "Other", title: `示例标题${i}`, url: `/article/Other/${i}`,
+          date: "2026-01-01", isPinned: false, authorUid: null, authorRaw: "u",
+          replyCount: 0, lastReply: "", lastReplierUid: null,
+        });
+      }
+
+      const result = await searchArticlesUseCase({
+        keyword: "示例",
+        source: "local",
+        boards: ["Demo", "Other"],
+        maxResults: 3,
+        maxItems: 2,
+        tree,
+        store: db,
+      });
+      expect(result.kind).toBe("results");
+      if (result.kind !== "results") return;
+      expect(result.truncated).toBe(true); // 每版 5 条 > 2，截断
+      expect(result.total).toBeLessThanOrEqual(3);
+      expect(result.boards.length).toBeGreaterThan(0);
+      for (const group of result.boards) {
+        expect(group.count).toBeLessThanOrEqual(2);
+      }
+    } finally {
+      db.close();
+      if (fs.existsSync(tmpFile)) fs.unlinkSync(tmpFile);
+    }
   });
 });

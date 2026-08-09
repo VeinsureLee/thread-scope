@@ -23,6 +23,10 @@ export interface ArticleNodeOptions {
   readonly children?: readonly ArticleNode[];
   readonly images?: readonly string[];
   readonly postedAt?: string | null;
+  /** 客户端类型（"手机客户端" | "网页" | null） */
+  readonly client?: string | null;
+  /** 来源 IP（匿名 → null） */
+  readonly ip?: string | null;
 }
 
 export class ArticleNode {
@@ -39,6 +43,8 @@ export class ArticleNode {
   readonly children: ArticleNode[];
   images: string[];
   postedAt: string | null;
+  client: string | null;
+  ip: string | null;
 
   constructor(options: ArticleNodeOptions) {
     this.id = options.id;
@@ -54,6 +60,8 @@ export class ArticleNode {
     this.children = [...(options.children ?? [])];
     this.images = [...(options.images ?? [])];
     this.postedAt = options.postedAt ?? null;
+    this.client = options.client ?? null;
+    this.ip = options.ip ?? null;
     for (const child of this.children) child.setParent(this.id, this.replyDepth + 1);
   }
 
@@ -71,12 +79,14 @@ export class ArticleNode {
     this.children.push(reply);
   }
 
-  updateContent(patch: Partial<Pick<ArticleNode, "title" | "content" | "author" | "images" | "postedAt">>): void {
+  updateContent(patch: Partial<Pick<ArticleNode, "title" | "content" | "author" | "images" | "postedAt" | "client" | "ip">>): void {
     if (patch.title !== undefined) this.title = patch.title;
     if (patch.content !== undefined) this.content = patch.content;
     if (patch.author !== undefined) this.author = patch.author;
     if (patch.images !== undefined) this.images = [...patch.images];
     if (patch.postedAt !== undefined) this.postedAt = patch.postedAt;
+    if (patch.client !== undefined) this.client = patch.client;
+    if (patch.ip !== undefined) this.ip = patch.ip;
   }
 
   findById(id: string, order: "dfs" | "bfs" = "dfs"): ArticleNode | null {

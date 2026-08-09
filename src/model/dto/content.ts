@@ -22,12 +22,16 @@ export interface Post {
   authorRaw: string;
   /** 匿名标记（见 docs/02 §5.2） */
   isAnon: boolean;
-  /** 正文/评论内容（含首行"发信人: ..."等元信息） */
+  /** 正文/评论内容（已清洗：去掉发信人/标题/发信站头部与 --/来源/修改尾部；保留引用块） */
   content: string;
   /** 图片 URL 列表 */
   images: string[];
   /** 发帖时间（ISO 字符串，由英文时间解析） */
   postTime: string | null;
+  /** 客户端类型（"手机客户端" | "网页" | null，由 ※ 来源 尾部解析） */
+  client?: string | null;
+  /** 来源 IP（含 IPv6；匿名来源 → null） */
+  ip?: string | null;
   /** 楼层位置文本（楼主/沙发/板凳/第N楼，可空） */
   posText: string;
   /** 作者昵称（L1 内嵌资料，详情页 .a-u-uid；可空） */

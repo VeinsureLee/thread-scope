@@ -21,7 +21,7 @@ function wrap(body: string): string {
 }
 
 describe("crawl/content — parseThreadPage", () => {
-  it("解析实名首帖：kind=article、作者 uid、时间", () => {
+  it("解析实名首帖：kind=article、作者 uid、时间、正文清洗", () => {
     const { posts, title } = parseThreadPage("Demo", "1001", wrap(REAL_FIRST_FLOOR));
     expect(title).toBe("test");
     expect(posts).toHaveLength(1);
@@ -32,7 +32,11 @@ describe("crawl/content — parseThreadPage", () => {
     expect(p.authorRaw).toBe("user_a");
     expect(p.isAnon).toBe(false);
     expect(p.postTime).toBe("2017-10-19T11:04:35");
-    expect(p.content).toContain("这是示例正文内容");
+    // 正文清洗：去掉 发信人/标题/发信站 头部与 修改 尾部
+    expect(p.content).toBe("这是示例正文内容");
+    expect(p.content).not.toContain("发信人:");
+    expect(p.client).toBeNull(); // ※ 修改 行无客户端
+    expect(p.ip).toBe("1.2.3.*"); // ※ 修改 行含 IP
   });
 
   it("解析实名评论：kind=reply、楼层=板凳→3、性别保密图标不误判匿名", () => {

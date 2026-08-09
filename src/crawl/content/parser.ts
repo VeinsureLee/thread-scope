@@ -1,7 +1,8 @@
 import { load, type CheerioAPI } from "cheerio";
 import { selectors } from "../../core/config.js";
 import { parseAuthor } from "../user/index.js";
-import { uidFromHref, parsePostTime, isAnonymousWith$, isAnonSource } from "../common/parser-kit.js";
+import { uidFromHref, isAnonymousWith$, isAnonSource } from "../common/parser-kit.js";
+import { parsePostContent } from "../common/parse-post-content.js";
 import type { Post } from "../../model/dto/index.js";
 
 /**
@@ -75,14 +76,12 @@ function parseFloor(
   const posText = $head.find(sel.post_pos).first().text().trim();
   const floor = floorFromPos(posText, $wrap, $);
 
-  // ── 内容 + 图片 ──
+  // ── 内容 + 图片：原始块 → 清洗 → body/client/ip/postTime ──
   const $contentWrap = $wrap.find(sel.post_content).first();
   if ($contentWrap.length === 0) return null;
 
-  const { text: content, images } = extractContent($, $contentWrap);
-
-  // ── 时间 ──
-  const postTime = parsePostTime(content);
+  const { text: raw, images } = extractContent($, $contentWrap);
+  const parsed = parsePostContent(raw);
 
   // ── L1 内嵌作者资料（docs/06 §2.3） ──
   const embedded = parseEmbeddedAuthor($, $wrap);
@@ -93,9 +92,11 @@ function parseFloor(
     authorUid: uid,
     authorRaw: name || "匿名",
     isAnon,
-    content,
+    content: parsed.body,
     images,
-    postTime,
+    postTime: parsed.postTime,
+    client: parsed.client,
+    ip: parsed.ip,
     posText,
     authorNick: embedded.nick,
     authorGender: embedded.gender,
