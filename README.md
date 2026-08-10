@@ -1,8 +1,24 @@
 # Thread Scope
 
-针对论坛设计的内容爬取 MCP 服务：论坛结构发现、版面流量监控、文章/正文搜索与本地持久化。
+**为 LLM/Agent 提供论坛内容访问能力的 MCP 服务** —— 让 Claude Code 等 AI 助手通过标准 MCP 工具,直接发现论坛结构、监控版面流量、搜索并本地持久化文章/正文/用户,构建可查询的内容库。
 
-> 版本：1.0.0 · 8 个 MCP 工具全部就绪。
+> 版本：1.0.0 · 12 个 MCP 工具全部就绪 · 面向 [BYR 北邮人论坛] 的内容爬取与检索
+
+---
+
+## 项目定位
+
+Thread Scope 解决的是"**AI 助手如何高效、合规地获取论坛数据**"这一场景:
+
+| 痛点 | Thread Scope 的解法 |
+|---|---|
+| AI 没有访问论坛数据的能力 | 12 个 MCP 工具暴露结构/流量/搜索/内容/用户能力,宿主(如 Claude Code)可直接调用 |
+| 论坛数据量大、网络抓取慢 | 增量爬取 + `url_hash` 去重 + 本地缓存优先,能查库不重爬 |
+| 搜索无相关性、结果过多 | FTS5 全文索引(中文 bigram 预切分)+ bm25 相关性排序 + 结果规模控制(截断信号) |
+| 内容含大量冗余噪音 | 正文清洗(剥离发信人/来源头部尾部,提取时间/客户端/IP) |
+| 爬取无序、容易重复 | 结构树 + 任务计划 + 统一并发池,失败隔离不中断 |
+
+**典型用途**:版面内容运营分析、论坛数据研究、基于论坛内容的 LLM 应用(检索增强)、历史帖子检索。
 
 ---
 
@@ -18,6 +34,41 @@
 | 一键初始化 | `forum-init` | 联网，保存结构 JSON | ✅ |
 | 搜索文章 | `forum-search-articles` | 本地 / 联网 / 自动 | 联网时 |
 | 搜索正文 | `forum-search-threads` | 本地 / 联网 / 自动 | 联网时 |
+| 用户资料 | `forum-get-user` / `forum-fetch-user-profiles` / `forum-fetch-user-titles` | 联网，落库 user 表 | ✅ |
+
+---
+
+## 效果展示
+
+三份端到端测试会话记录（关键信息已打码处理），覆盖：登录 → 结构/流量 → 搜索 → 抓正文 → 用户查询。
+
+<table>
+  <tr>
+    <td align="center"><img src="docs/imgs/Test%20snapshot/实习.png" alt="实习快照" width="250"><br>① 招聘实习检索<br><a href="docs/E2E%20Test/E2E%20Test%20-%20实习.md">详细记录</a></td>
+    <td align="center"><img src="docs/imgs/Test%20snapshot/征友.png" alt="征友快照" width="250"><br>② 征友检索<br><a href="docs/E2E%20Test/E2E%20Test%20-%20征友.md">详细记录</a></td>
+    <td align="center"><img src="docs/imgs/Test%20snapshot/日常.png" alt="日常快照" width="250"><br>③ 日常闲聊与版面分析<br><a href="docs/E2E%20Test/E2E%20Test%20-%20日常.md">详细记录</a></td>
+  </tr>
+</table>
+
+**对话详情示例**（还挺有意思的）：
+
+<div align="center">
+  <img src="docs/imgs/Test%20snapshot/interesting.png" alt="有意思的截图" width="180">
+</div>
+
+### 测试方法
+
+| 工具 \ 测试 | [实习](docs/E2E%20Test/E2E%20Test%20-%20实习.md)（找招聘/实习） | [征友](docs/E2E%20Test/E2E%20Test%20-%20征友.md)（找对象） | [日常](docs/E2E%20Test/E2E%20Test%20-%20日常.md)（闲聊+版面分析） |
+|---|---|---|---|
+| `forum-login` | 1 | 1 | 1 |
+| `forum-fetch-structure` | 1 | 1 | 1 |
+| `forum-fetch-board-articles` | 5 | — | 6 |
+| `forum-fetch-thread` | 8 | — | 12 |
+| `forum-fetch-traffic` | — | — | 1 |
+| `forum-search-articles` | 1 | 11 | 6 |
+| `forum-get-user` | — | — | 4 |
+
+> MCP 配置教程见 [docs/mcp-config.md](docs/mcp-config.md)。
 
 ---
 
@@ -35,7 +86,7 @@
                 │             │
         ┌───────▼─────┐ ┌─────▼──────────┐
         │   tools/    │ │  logging/      │   ← 工具层（Zod schema + handler）
-        │ 8 个工具     │ │  traceId/日志   │
+        │ 12 个工具    │ │  traceId/日志   │
         └───────┬─────┘ └─────┬──────────┘
                 │             │
 ┌───────────────▼─────────────▼──────────────────────┐
@@ -64,7 +115,7 @@
 
 `forum-fetch-structure` 默认读取本地缓存 `data/structure-overview.json`（秒回，无需登录）；`refresh=true` 强制联网重爬并更新缓存；`parentId` 展开子节点需联网。
 
-### 2. 搜索：本地 / 联网 双通道
+### 2. 搜索：本地 / 联网 双通道 + 全文索引
 
 | source | 行为 |
 |---|---|
@@ -72,14 +123,7 @@
 | `remote` | 只联网搜索（+抓正文，需登录） |
 | `auto`（默认） | 先查本地，有命中即返回；无命中再联网 |
 
-| scope | 范围 |
-|---|---|
-| `all` | 全站所有版面（约 3 分钟） |
-| `top`（默认） | 流量最高的前 5 个版面 |
-| `board` | 单版面（配 `boardName`） |
-| `section` | 分区递归（配 `boardName` 分区节点 ID） |
-
-本地命中返回的是**历史已持久化**的子集，不是全站；要全量结果用 `scope=all` + `source=remote`。
+本地搜索基于 **FTS5 全文索引**（中文按重叠二元组预切分，1 字关键词回退 LIKE），支持 bm25 相关性排序；结果按版分组、每版/全局限量，返回 `truncated` 截断信号引导宿主收敛（`boards` / `from` / `to` / 换词）。
 
 ### 3. 流量：采样 + 异步落库
 
@@ -103,7 +147,7 @@
 | 内容库 | `data/forum-content.db`（SQLite） | board / article / post / user 表，增量去重（url_hash） |
 | 流量库 | `data/forum-traffic.db`（SQLite） | 历史流量采样 |
 
-> `data/`、`.env`、`*.log` 均在 `.gitignore` 中，不进入版本控制。凭证只在 `.env`，从不进入工具入参或日志。
+> `data/`、`.env`、`*.log`、`output/` 均在 `.gitignore` 中，不进入版本控制。凭证只在 `.env`，从不进入工具入参或日志。
 
 ---
 
@@ -111,7 +155,7 @@
 
 ### 环境要求
 
-- Node.js ≥ 22.5（使用内置 `node:sqlite`）
+- Node.js ≥ 22.5（使用内置 `node:sqlite`，FTS5 全文索引）
 - npm
 
 ### 安装与配置
@@ -129,6 +173,8 @@ npm run dev          # tsx 直接运行 MCP 服务
 npm run inspect      # 构建后启动 MCP Inspector
 ```
 
+`npm run inspect` 会启动 **MCP Inspector**——官方图形化调试面板：可在网页里浏览、调用本服务的全部工具、查看请求/响应 JSON，适合本地联调工具行为（无需经过 Claude Code）。
+
 ### 测试
 
 ```bash
@@ -139,20 +185,40 @@ BYR_LIVE=1 npm test -- test/crawl/traffic-live.test.ts   # 真实登录的集成
 
 ---
 
+## 作为 MCP 服务使用
+
+MCP 服务以 **stdio 传输**运行：客户端 spawn 一条命令（`npx tsx /绝对路径/thread-scope/src/index.ts`），通过 stdin/stdout 走 JSON-RPC；服务内部路径锚定项目根，cwd 不敏感。
+
+**配置教程见 [docs/mcp-config.md](docs/mcp-config.md)** —— 包含命令行 `claude mcp add`、cc-switch 保姆级图文、项目 `.mcp.json` 三种方式，及使用流程与 `.env` 说明。
+
+快速开始（用户级，写入 `~/.claude.json`）：
+
+```bash
+claude mcp add thread-scope -- npx tsx /绝对路径/thread-scope/src/index.ts
+```
+
+> 使用前先 `forum-login`（需 `.env` 账号密码）；读缓存类操作（本地搜索 / 结构缓存 / 历史流量）无需登录。
+
+---
+
 ## MCP 工具
 
 | 工具名 | 主要参数 | 说明 |
 |---|---|---|
-| `forum-login` | — | 登录论坛，保存认证 Cookie |
-| `forum-fetch-structure` | `parentId?` `refresh?` | 论坛结构树；默认读缓存，refresh 联网 |
+| `forum-login` | — | 登录论坛，保存认证 Cookie（所有联网工具前置） |
+| `forum-init` | `withStructure?` `withManagers?` `withArticles?` `concurrency?` | 一键初始化：结构（默认）+ 版主（默认）+ 可选首页文章 |
+| `forum-fetch-structure` | `parentId?` `refresh?` | 论坛结构树；默认读缓存，refresh 联网，parentId 展开 |
 | `forum-fetch-board-articles` | `boardName` `maxPages?` `maxItems?` | 版块文章列表，落库 article 表 |
-| `forum-fetch-traffic` | `nodeId?` `concurrency?` | 版面/分区流量；采样异步落库 |
-| `forum-query-traffic-history` | `boardEname` `from?` `to?` `limit?` | 历史流量查询 |
-| `forum-init` | — | 一键爬取全站结构并保存 |
-| `forum-search-articles` | `keyword` `source?` `scope?` `boardName?` `author?` `maxPages?` `maxItems?` `maxBoards?` `persist?` `concurrency?` | 搜索文章候选（标题/URL/作者/回复数），不抓正文 |
-| `forum-search-threads` | `keyword` `source?` `scope?` `boardName?` `author?` `maxPages?` `maxItems?` `maxBoards?` `maxThreads?` `maxThreadPages?` `persist?` `concurrency?` | 搜索帖子并抓取正文与全部评论，可落库 |
+| `forum-fetch-thread` | `boardName` `articleId` `maxPages?` `persist?` | 单帖首帖+评论树，落库 |
+| `forum-fetch-traffic` | `nodeId?` `concurrency?` | 版面/分区实时流量；树状聚合，采样异步落库 |
+| `forum-query-traffic-history` | `boardEname` `from?` `to?` `limit?` | 历史流量查询（本地库） |
+| `forum-search-articles` | `keyword` `source?` `boards?` `author?` `maxPages?` `maxItems?` `maxResults?` `from?` `to?` `sort?` `persist?` `concurrency?` | 搜索文章（列表级，不抓正文），按版分组返回，含 truncated 截断信号 |
+| `forum-search-threads` | `keyword` `source?` `boards?` `author?` `maxPages?` `maxItems?` `maxThreadsPerBoard?` `maxThreads?` `maxThreadPages?` `from?` `to?` `sort?` `persist?` `concurrency?` | 搜索帖子并抓正文与全部评论，可落库 |
+| `forum-get-user` | `uid` `includeTitles?` `persist?` | 按 uid 查询单用户资料 |
+| `forum-fetch-user-profiles` | `uids?` `concurrency?` `force?` `persist?` | 批量抓取用户资料 |
+| `forum-fetch-user-titles` | `uids?` `force?` | 抓取用户特殊头衔 |
 
-`source ∈ {auto, local, remote}`，`scope ∈ {all, top, board, section}` —— 语义见上文「核心设计」。
+`source ∈ {auto, local, remote}`；`boards` 数组元素可为版块英文名/分区 id/分区·版块中文名，或特殊值 `"all"`（全站）与 `"top"`（流量前5版），省略 = 全站。`sort ∈ {recent, relevant}`、`from`/`to` 仅本地搜索生效。
 
 ---
 
@@ -179,7 +245,7 @@ BYR_LIVE=1 npm test -- test/crawl/traffic-live.test.ts   # 真实登录的集成
 | HTTP | axios | arraybuffer 响应 |
 | 解析 | cheerio | HTML → 数据 |
 | 编码 | iconv-lite | GBK → UTF-8 |
-| 存储 | `node:sqlite`（内置） | 零额外依赖 |
+| 存储 | `node:sqlite`（内置） | 零额外依赖，FTS5 全文索引 |
 | 校验 | zod v4 | 工具入参 schema |
 | 测试 | vitest | 单元 + 解析 + 集成 |
 | 配置 | js-yaml + dotenv | 规则 YAML + 凭证 env |
@@ -193,3 +259,5 @@ BYR_LIVE=1 npm test -- test/crawl/traffic-live.test.ts   # 真实登录的集成
 3. **模块解耦**：爬取不依赖存储实现，存储不依赖查询接口
 4. **失败可恢复**：单版面失败隔离，不中断整体；写库失败不影响返回
 5. **隐私边界**：凭证只在 .env，日志与返回不含论坛内部信息
+
+[BYR 北邮人论坛]: https://bbs.byr.cn
