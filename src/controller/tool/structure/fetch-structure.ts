@@ -1,4 +1,4 @@
-import type { McpServer } from "@modelcontextprotocol/server";
+import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { fetchStructure } from "../../../application/use-case/structure/fetch-structure.js";
 import { presentStructure } from "../../presenter/structure.js";

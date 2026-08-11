@@ -26,10 +26,19 @@ interface JsonRpcMessage {
 /** 累积未处理完的 stdin 字节（跨 chunk 的 JSON-RPC 消息） */
 let pending = "";
 
-/** StandardSchemaV1 的同步校验结果形态 */
+/** Standard Schema 的同步校验结果形态 */
 interface SyncValidateResult {
   value?: unknown;
   issues?: Array<{ message: string }>;
+}
+
+/** 仅声明我们需要的 ~standard 校验入口（不依赖 zod 内部类型） */
+interface StandardSchemaLike {
+  ["~standard"]?: {
+    validate: (
+      v: unknown,
+    ) => SyncValidateResult | Promise<SyncValidateResult>;
+  };
 }
 
 /** 校验 tools/call 入参，返回错误描述（校验通过 / 无法判定返回 null） */
@@ -40,9 +49,7 @@ export function validateCallArgs(msg: JsonRpcMessage): string | null {
 
   if (!name || !schema) return null; // 未知工具 / 无 schema，跳过
 
-  const std = schema["~standard"] as
-    | { validate: (v: unknown) => SyncValidateResult | Promise<SyncValidateResult> }
-    | undefined;
+  const std = (schema as unknown as StandardSchemaLike)["~standard"];
   if (!std) return null;
 
   const result = std.validate(args);

@@ -1,4 +1,4 @@
-import type { McpServer } from "@modelcontextprotocol/server";
+import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { fetchUserProfilesUseCase } from "../../../application/use-case/user/fetch-user-profiles-impl.js";
 import { DEFAULT_CONCURRENCY, MAX_CONCURRENCY } from "../../../core/config.js";

@@ -1,4 +1,4 @@
-import type { McpServer } from "@modelcontextprotocol/server";
+import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { getUser } from "../../../application/use-case/user/get-user.js";
 import { presentGetUser } from "../../presenter/user.js";

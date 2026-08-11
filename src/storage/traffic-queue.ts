@@ -8,18 +8,29 @@ import { logError } from "../logging/logger.js";
  * 生命周期：
  * - enqueue 将任务入队（fire-and-forget）
  * - 队列在空闲时 drain（进程事件循环空闲）
- * - 进程退出前 flush 剩余任务（保证不丢）
+ * - 进程退出前 flush 剩余任务（保证不丢；SIGINT/SIGTERM 见 index.ts）
  * - 任务失败记录到 onError 回调，不影响调用方
+ *
+ * 防积压：任务数超过 MAX_PENDING 时立即同步 drain（写库任务同步执行很快，
+ * 极端高流量下防止内存无限增长）。
  */
 export class TaskQueue {
   private queue: (() => void)[] = [];
   private draining = false;
+
+  /** 队列积压上限：超过后立即 drain（防止持续入队撑爆内存） */
+  static readonly MAX_PENDING = 5000;
 
   constructor(private onError: (err: unknown) => void = console.error) {}
 
   /** 入队一个任务（同步副作用，如 DB insert） */
   enqueue(task: () => void): void {
     this.queue.push(task);
+    if (this.queue.length >= TaskQueue.MAX_PENDING) {
+      // 积压保护：写库是同步任务，立即清空远比 setImmediate 拖到下一 tick 安全
+      this.drain();
+      return;
+    }
     this.scheduleDrain();
   }
 

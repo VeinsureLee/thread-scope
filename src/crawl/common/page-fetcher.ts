@@ -1,5 +1,34 @@
-import { ajaxGet } from "../../core/http-client.js";
-import { http } from "../../core/config.js";
+import { ajaxGet, clearCookie } from "../../core/http-client.js";
+import { http, sessionExpired } from "../../core/config.js";
+import { logWarn } from "../../logging/logger.js";
+
+/**
+ * 会话过期/未登录错误：命中强特征时抛出，不参与重试（重试只会重复请求登录页）。
+ */
+export class SessionExpiredError extends Error {
+  constructor(signal: string) {
+    super(
+      `会话已过期或未登录（页面特征: ${signal}），请重新调用 forum-login 后再试`,
+    );
+    this.name = "SessionExpiredError";
+  }
+}
+
+/** 检测强特征：命中任一 → 返回特征串（未命中返回 null） */
+function detectSessionExpired(html: string): string | null {
+  for (const signal of sessionExpired.html_signals ?? []) {
+    if (signal && html.includes(signal)) return signal;
+  }
+  return null;
+}
+
+/** 检测弱特征：命中任一 → 返回特征串（仅用于诊断日志，不抛错） */
+function detectSuspicious(html: string): string | null {
+  for (const signal of sessionExpired.suspicious_signals ?? []) {
+    if (signal && html.includes(signal)) return signal;
+  }
+  return null;
+}
 
 /**
  * 统一页面抓取器：在 ajaxGet 之上叠加【限速】与【重试】。
@@ -9,6 +38,7 @@ import { http } from "../../core/config.js";
  * - 限速策略：两次请求最小间隔 `request_interval_ms`（config/rules/http.yaml），
  *   默认 20ms = 1 秒 50 次；
  * - 重试策略（已验收）：失败重试 3 次（共 4 次尝试）；
+ * - 会话过期检测：HTML 命中强特征（未登录页）→ 立即抛错不重试；弱特征仅记 warn；
  * - 同一时刻只允许一个"等间距"请求序列（令牌队列），翻页并发时也不会突刺。
  */
 export class PageFetcher {
@@ -24,7 +54,7 @@ export class PageFetcher {
   }
 
   /**
-   * 抓取页面 HTML（限速 + 重试）。
+   * 抓取页面 HTML（限速 + 重试 + 会话过期检测）。
    *
    * @param path     相对论坛根路径，如 "/board/Beauty?p=2"（与 ajaxGet 一致）
    * @param fetcher  底层请求函数，默认 ajaxGet；测试可注入 fake
@@ -38,8 +68,29 @@ export class PageFetcher {
     let lastErr: unknown;
     for (let attempt = 0; attempt <= this.maxRetries; attempt++) {
       try {
-        return await fetcher(path);
+        const html = await fetcher(path);
+
+        // 会话过期检测：强特征 → 抛错不重试，并清除本地 Cookie（下次 requireLogin 即提示未登录）
+        const expiredSignal = detectSessionExpired(html);
+        if (expiredSignal) {
+          clearCookie();
+          throw new SessionExpiredError(expiredSignal);
+        }
+        // 弱特征 → 仅记 warn（选择器失效/站点改版诊断）
+        const suspiciousSignal = detectSuspicious(html);
+        if (suspiciousSignal) {
+          logWarn("crawl", {
+            message: "页面疑似未登录/异常（弱特征命中，仅诊断）",
+            path,
+            signal: suspiciousSignal,
+            htmlLength: html.length,
+          }, "crawl.session");
+        }
+
+        return html;
       } catch (err) {
+        // 会话过期不重试：重试只会重复抓登录页
+        if (err instanceof SessionExpiredError) throw err;
         lastErr = err;
         // 失败后冷却一小段时间再重试，避免高频重试再次触发风险
         await this.wait(this.intervalMs * (attempt + 2));

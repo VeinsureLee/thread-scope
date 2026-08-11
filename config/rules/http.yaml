@@ -40,3 +40,20 @@ user:
   # 用户资料 TTL（小时）：批量抓取时，profile_fetched_at 距今 < TTL 的用户跳过（不重抓）。
   # 等级/积分等会变，TTL 到期后重抓覆盖更新；force=true 可强制重抓。
   profile_ttl_hours: 72
+
+# ── 会话过期检测 ──
+# 会话过期后，目标站点会把受保护页面换成“未登录/登录引导”页。若继续按正常页面解析，
+# 会静默产出空结果（对 LLM 宿主表现为“搜不到”，极难诊断）。PageFetcher 拿到 HTML 后
+# 按以下特征检测：
+# - html_signals（强）：命中任一 → 判定会话失效，立即抛错（不重试）并清除本地 Cookie，
+#   提示重新调用 forum-login。请按目标站点真实的未登录页调整（宁缺勿滥，避免误判）。
+# - suspicious_signals（弱）：命中任一 → 仅记 warn 日志（用于选择器失效/站点改版诊断）。
+session_expired:
+  html_signals:
+    - "user/login"
+    - "id=\"login_box\""
+    - "name=\"passwd\""
+  suspicious_signals:
+    - "请登录"
+    - "登录后"
+    - "login_form"

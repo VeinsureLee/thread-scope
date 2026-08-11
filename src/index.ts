@@ -1,15 +1,16 @@
-import { McpServer } from "@modelcontextprotocol/server";
-import { StdioServerTransport } from "@modelcontextprotocol/server/stdio";
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { flushTrafficWrites } from "./storage/traffic-queue.js";
 import { logInfo, logError, logFilePath } from "./logging/logger.js";
 import { attachValidationProbe } from "./logging/validation-probe.js";
+import { APP_VERSION } from "./core/config.js";
 
 import { registerAllTools } from "./controller/registry.js";
 
 // ── 创建 MCP Server ──
 const server = new McpServer({
   name: "forum-mcp",
-  version: "1.0.0",
+  version: APP_VERSION,
 });
 
 // ── 注册工具 ──
@@ -40,3 +41,12 @@ main().catch((error: unknown) => {
 process.on("exit", () => {
   flushTrafficWrites();
 });
+
+// SIGINT/SIGTERM（Ctrl-C / kill）先 flush 再退出，防止后台写库队列丢数据
+for (const signal of ["SIGINT", "SIGTERM"] as const) {
+  process.on(signal, () => {
+    logInfo("system", { message: `received ${signal}, flushing queue and exiting` }, "system");
+    flushTrafficWrites();
+    process.exit(0);
+  });
+}

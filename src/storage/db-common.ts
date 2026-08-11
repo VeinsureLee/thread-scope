@@ -6,7 +6,9 @@ import { fromRoot } from "../core/paths.js";
 // ============================================================
 // db-common：SQLite 通用辅助（docs/01 §2.2 — 全项目唯一值得做成基类的点）
 // ============================================================
-// 所有 *Db（TrafficDb / ContentDb）共享：打开连接、建目录、执行迁移、事务模板。
+// 所有 *Db（TrafficDb / ContentDb）共享：打开连接、建目录、事务模板。
+// schema 演进不在 openDb：ContentDb 走 migrations/（版本化迁移，
+// PRAGMA user_version），TrafficDb 用自身的幂等 CREATE TABLE。
 // ============================================================
 
 /** data 目录绝对路径（锚定项目根；不存在则创建） */
@@ -27,16 +29,17 @@ export function dbFilePath(filename: string): string {
 }
 
 /**
- * 打开一个 SQLite 连接，并执行建表/迁移 SQL。
- * 迁移采用 `CREATE TABLE IF NOT EXISTS` 幂等写法（与 TrafficDb 现有方式一致）。
+ * 打开一个 SQLite 连接并应用通用 PRAGMA。
+ * schema 演进走 migrations/（版本化迁移，PRAGMA user_version），不在此执行。
  */
-export function openDb(filename: string, migrations: string[]): DatabaseSync {
+export function openDb(filename: string): DatabaseSync {
   const db = new DatabaseSync(dbFilePath(filename));
   // 开启外键约束（content 表之间的 REFERENCES 依赖）
   db.exec("PRAGMA foreign_keys = ON;");
-  for (const sql of migrations) {
-    db.exec(sql);
-  }
+  // WAL 模式：读写不互斥，批量写摊薄 fsync，适合本项目“采集写 + 查询读”并存
+  // 的访问形态；-wal/-shm 文件落在 data/（已 gitignore）。内存库(:memory:)会自动回退。
+  db.exec("PRAGMA journal_mode = WAL;");
+  db.exec("PRAGMA synchronous = NORMAL;");
   return db;
 }
 

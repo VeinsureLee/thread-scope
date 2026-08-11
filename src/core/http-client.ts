@@ -1,11 +1,46 @@
 import axios, { type AxiosResponse } from "axios";
+import * as fs from "fs";
+import * as path from "path";
 import { forum, http, routes, secrets } from "./config.js";
 import { decodeBody } from "./encoding.js";
+import { fromRoot } from "./paths.js";
 
 // ========== Cookie 管理 ==========
 
-/** 模块级 Cookie 状态 */
-let globalCookie = "";
+/** 会话 Cookie 持久化文件（data/ 已 gitignore；仅本机可读） */
+const COOKIE_FILE = fromRoot("data/session-cookie.txt");
+
+/** 从本地文件恢复会话 Cookie（启动自动恢复，免每次手动登录） */
+function loadCookieFromDisk(): string {
+  try {
+    if (!fs.existsSync(COOKIE_FILE)) return "";
+    return fs.readFileSync(COOKIE_FILE, "utf-8").trim();
+  } catch {
+    return "";
+  }
+}
+
+/** 写盘当前 Cookie（权限 600；失败静默，不阻断请求） */
+function persistCookieToDisk(cookie: string): void {
+  try {
+    fs.mkdirSync(path.dirname(COOKIE_FILE), { recursive: true });
+    fs.writeFileSync(COOKIE_FILE, cookie, { mode: 0o600 });
+  } catch {
+    // 只读目录 / 磁盘错误等：登录态不持久化，不影响本次请求
+  }
+}
+
+/** 删除本地会话 Cookie 文件（登出/检测到过期时） */
+function removeCookieFile(): void {
+  try {
+    if (fs.existsSync(COOKIE_FILE)) fs.unlinkSync(COOKIE_FILE);
+  } catch {
+    // 忽略删除失败
+  }
+}
+
+/** 模块级 Cookie 状态（启动时优先从本地文件恢复） */
+let globalCookie = loadCookieFromDisk();
 
 /** 从响应 Set-Cookie 头中提取并合并 Cookie */
 export function saveCookie(resp: AxiosResponse): void {
@@ -27,6 +62,7 @@ export function saveCookie(resp: AxiosResponse): void {
   }
   // 重新拼装（保持插入顺序，重复键以最后值为准）
   globalCookie = [...map.entries()].map(([k, v]) => `${k}=${v}`).join("; ");
+  persistCookieToDisk(globalCookie);
 }
 
 /** 获取当前保存的 Cookie 字符串 */
@@ -34,9 +70,10 @@ export function getCookie(): string {
   return globalCookie;
 }
 
-/** 清除所有 Cookie */
+/** 清除所有 Cookie（并删除本地持久化文件） */
 export function clearCookie(): void {
   globalCookie = "";
+  removeCookieFile();
 }
 
 // ========== HTTP 请求 ==========

@@ -1,4 +1,4 @@
-import type { McpServer } from "@modelcontextprotocol/server";
+import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { registerLoginTool } from "./tool/auth/login.js";
 import { registerFetchStructureTool } from "./tool/structure/fetch-structure.js";
 import { registerFetchArticlesTool } from "./tool/article/fetch-articles.js";

@@ -93,8 +93,9 @@ Thread Scope 解决的是"**AI 助手如何高效、合规地获取论坛数据*
 │              auth/ · crawl/ · storage/             │   ← 领域层
 │   crawl 按域：structure / traffic / article /      │
 │               content / search / user              │
-│   storage：content-db / traffic-db / traffic-queue │
-│               / structure-store                    │
+│   storage：content-db（门面 + migrations/ 版本化迁移 +│
+│               content/ 领域仓储）/ traffic-db /       │
+│               traffic-queue / structure-store         │
 └───────────────────────┬────────────────────────────┘
                         │
 ┌───────────────────────▼────────────────────────────┐
@@ -144,10 +145,31 @@ Thread Scope 解决的是"**AI 助手如何高效、合规地获取论坛数据*
 | 数据 | 存储 | 说明 |
 |---|---|---|
 | 论坛结构 | `data/structure-overview.json` | `forum-init` / `fetch-structure(refresh)` 产出 |
-| 内容库 | `data/forum-content.db`（SQLite） | board / article / post / user 表，增量去重（url_hash） |
-| 流量库 | `data/forum-traffic.db`（SQLite） | 历史流量采样 |
+| 内容库 | `data/forum-content.db`（SQLite，WAL） | board / article / post / user 表，增量去重（url_hash） |
+| 流量库 | `data/forum-traffic.db`（SQLite，WAL） | 历史流量采样 |
+| 会话 Cookie | `data/session-cookie.txt`（权限 600） | 启动自动恢复，免每次手动登录 |
 
 > `data/`、`.env`、`*.log`、`output/` 均在 `.gitignore` 中，不进入版本控制。凭证只在 `.env`，从不进入工具入参或日志。
+
+### 数据库维护
+
+内容库增量累积，长期运行后文件会虚涨（更新/删除留下的空洞）。提供一键维护脚本：
+
+```bash
+npm run maintain   # WAL checkpoint + VACUUM + FTS5 bigram 索引重建 + 规模/新鲜度统计
+```
+
+纯本地操作，不联网、不需要登录，可定期执行。
+
+> **Schema 演进**：建表/补列/删列等结构变更放在 `src/storage/migrations/`（版本化迁移，
+> 以 SQLite `PRAGMA user_version` 记录已应用版本，只执行一次、失败整体回滚）。新增变更 →
+> 追加一个 `v00X-*.ts` 文件并在 `migrations/index.ts` 注册即可。早期脏数据的幂等修复
+> （如旧帖正文清洗）则在启动期由 `content/repairs.ts` 执行。
+
+### 会话管理
+
+- **自动恢复**：进程启动时自动从 `data/session-cookie.txt` 恢复上次登录态，大多数场景启动即可用，无需每次手动 `forum-login`；
+- **过期自检**：会话过期后论坛会把受保护页面换成未登录页。PageFetcher 按 `config/rules/http.yaml` 的 `session_expired` 特征检测：命中强特征 → 立即报错并清除本地 Cookie（提示重新登录），不静默返回空结果；命中弱特征 → 仅记 warn 日志，用于站点改版/选择器失效诊断。
 
 ---
 
@@ -230,7 +252,7 @@ claude mcp add thread-scope -- npx tsx /绝对路径/thread-scope/src/index.ts
 | `config/rules/routes.yaml` | 路由模板 |
 | `config/rules/selectors.yaml` | CSS 选择器与匿名版面规则 |
 | `config/rules/login.yaml` | 登录方式 |
-| `config/rules/http.yaml` | 请求头 / 超时 / 编码 |
+| `config/rules/http.yaml` | 请求头 / 超时 / 编码 / 限速 / 会话过期特征 |
 | `config/rules/log.yaml` | 日志配置 |
 | `.env` | 账号密码（不提交；参考 `.env.example`） |
 
@@ -241,7 +263,7 @@ claude mcp add thread-scope -- npx tsx /绝对路径/thread-scope/src/index.ts
 | 组件 | 选型 | 说明 |
 |---|---|---|
 | 运行时 | Node.js（ESM）+ TypeScript strict | — |
-| MCP | `@modelcontextprotocol/server` | stdio 传输 |
+| MCP | `@modelcontextprotocol/sdk` | stdio 传输 |
 | HTTP | axios | arraybuffer 响应 |
 | 解析 | cheerio | HTML → 数据 |
 | 编码 | iconv-lite | GBK → UTF-8 |

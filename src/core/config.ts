@@ -181,6 +181,8 @@ export interface HttpConfig {
     /** 资料 TTL（小时），批量抓取时跳过未过期用户 */
     profile_ttl_hours: number;
   };
+  /** 会话过期检测（未登录页特征） */
+  session_expired?: SessionExpiredConfig;
 }
 
 export const http = loadYaml<HttpConfig>("rules/http.yaml");
@@ -191,6 +193,38 @@ export const DEFAULT_CONCURRENCY = http.concurrency.default;
 export const MAX_CONCURRENCY = http.concurrency.max;
 /** 用户资料 TTL（小时，docs/06 §5.3） */
 export const USER_PROFILE_TTL_HOURS = http.user.profile_ttl_hours;
+
+// ════════════════════════════════════════════════════════════
+// 会话过期检测（未登录页特征，见 rules/http.yaml）
+// ════════════════════════════════════════════════════════════
+
+export interface SessionExpiredConfig {
+  /** 强特征：HTML 含任一即判定会话失效（抛错提示重新登录，不重试） */
+  html_signals: string[];
+  /** 弱特征：HTML 含任一仅记 warn 日志（用于选择器失效/改版诊断，不抛错） */
+  suspicious_signals: string[];
+}
+
+/** 会话过期检测配置（http.yaml session_expired 节） */
+export const sessionExpired: SessionExpiredConfig = http.session_expired ?? {
+  html_signals: [],
+  suspicious_signals: [],
+};
+
+// ════════════════════════════════════════════════════════════
+// 应用版本号（单源：package.json，构建/启动时读入，避免硬编码漂移）
+// ════════════════════════════════════════════════════════════
+
+export const APP_VERSION: string = (() => {
+  try {
+    const pkg = JSON.parse(
+      fs.readFileSync(fromRoot("package.json"), "utf-8"),
+    ) as { version?: string };
+    return pkg.version ?? "0.0.0";
+  } catch {
+    return "0.0.0";
+  }
+})();
 
 // ════════════════════════════════════════════════════════════
 // 搜索默认上限（docs 搜索优化：结果过多时截断 + truncated 信号）

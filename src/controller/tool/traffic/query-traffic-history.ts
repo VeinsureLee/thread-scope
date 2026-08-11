@@ -1,4 +1,4 @@
-import type { McpServer } from "@modelcontextprotocol/server";
+import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { queryTrafficHistory } from "../../../application/use-case/traffic/query-traffic-history.js";
 import { presentTrafficHistory } from "../../presenter/traffic-history.js";

@@ -1,4 +1,4 @@
-import type { McpServer } from "@modelcontextprotocol/server";
+import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { DEFAULT_CONCURRENCY, MAX_CONCURRENCY } from "../../../core/config.js";
 import { searchThreadsUseCase } from "../../../application/use-case/search/search-threads-use-case.js";

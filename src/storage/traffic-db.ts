@@ -38,6 +38,9 @@ export class TrafficDb {
 
   constructor(dbPath?: string) {
     this.db = new DatabaseSync(dbPath ?? dbFilePath());
+    // 与 ContentDb 一致：WAL 模式，写采样与查询读不互斥
+    this.db.exec("PRAGMA journal_mode = WAL;");
+    this.db.exec("PRAGMA synchronous = NORMAL;");
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS traffic_snapshot (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -164,6 +167,16 @@ export class TrafficDb {
       threads: r.threads,
       posts: r.posts,
     }));
+  }
+
+  /** 维护统计：采样行数 + 采样时间区间（维护脚本输出用） */
+  stats(): { snapshots: number; earliest: string | null; latest: string | null } {
+    const agg = this.db
+      .prepare(
+        `SELECT count(*) AS c, MIN(crawled_at) AS min_t, MAX(crawled_at) AS max_t FROM traffic_snapshot`,
+      )
+      .get() as { c: number; min_t: string | null; max_t: string | null };
+    return { snapshots: agg.c, earliest: agg.min_t, latest: agg.max_t };
   }
 
   /** 关闭连接 */

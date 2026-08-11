@@ -1,4 +1,4 @@
-import type { McpServer } from "@modelcontextprotocol/server";
+import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { fetchThread } from "../../../application/use-case/thread/fetch-thread.js";
 import { presentThread } from "../../presenter/thread.js";

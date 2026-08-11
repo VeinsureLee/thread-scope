@@ -10,6 +10,7 @@
     "build": "tsc",
     "start": "node build/index.js",
     "inspect": "npm run build && npx @modelcontextprotocol/inspector node build/index.js",
+    "maintain": "tsx scripts/maintain-db.ts",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage"
@@ -18,7 +19,7 @@
   "author": "Veinsure Lee",
   "license": "ISC",
   "dependencies": {
-    "@modelcontextprotocol/server": "^2.0.0",
+    "@modelcontextprotocol/sdk": "1.30.0",
     "axios": "^1.19.0",
     "cheerio": "^1.2.0",
     "dotenv": "^17.4.2",
