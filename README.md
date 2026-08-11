@@ -56,6 +56,18 @@ Thread Scope 解决的是"**AI 助手如何高效、合规地获取论坛数据*
   <img src="docs/imgs/Test%20snapshot/interesting.png" alt="有意思的截图" width="180">
 </div>
 
+### Agent 对比实验：谁用 MCP 用得更好
+
+用同一个论坛 MCP（thread-scope）在三个 Agent 上跑同一组任务（"今天有什么新鲜事" → 追热门帖 → 反查历史帖），对比 MCP 使用体验，推荐使用pi agent（使用效果最佳）。会话记录中设计论坛用户以及帖子详情的相关内容均已打码（版面名/用户名/帖子内容）。
+
+| Agent | 会话记录 | 体验评价 |
+|---|---|---|
+| **pi（推荐）** | [对比实验 · pi](docs/E2E%20Test/MCP%20Agent%20Comparison/E2E%20Test%20-%20对比实验pi.md) | 工具调用直接、参数报错即修、对话节奏自然，产出干净 |
+| claude | [对比实验 · claude](docs/E2E%20Test/MCP%20Agent%20Comparison/E2E%20Test%20-%20对比实验claude.md) | 步骤完整、善用落盘与过滤，但会话噪音多（大量空 assistant 帧）、过程冗长 |
+| codex | [对比实验 · codex](docs/E2E%20Test/MCP%20Agent%20Comparison/E2E%20Test%20-%20对比实验codex.md) | 总结详实、口径严谨，但多智能体框架噪音大、需先摸索工具、首次任务还被中断重来 |
+
+**推荐度：pi > claude > codex**（综合工具调用效率、失误修复速度、输出可读性）。
+
 ### 测试方法
 
 | 工具 \ 测试 | [实习](docs/E2E%20Test/E2E%20Test%20-%20实习.md)（找招聘/实习） | [征友](docs/E2E%20Test/E2E%20Test%20-%20征友.md)（找对象） | [日常](docs/E2E%20Test/E2E%20Test%20-%20日常.md)（闲聊+版面分析） |
