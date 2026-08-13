@@ -53,6 +53,9 @@ session_expired:
     - "user/login"
     - "id=\"login_box\""
     - "name=\"passwd\""
+    # 未登录错误页（200 但无内容，静默解析会产出空结果）：
+    # <div class="error"><li>您未登录,请登录后继续操作</li></div>
+    - "您未登录"
   suspicious_signals:
     - "请登录"
     - "登录后"

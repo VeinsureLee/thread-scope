@@ -6,7 +6,7 @@ import {
   loginRules,
   secrets,
 } from "../core/config.js";
-import { saveCookie, getCookie, clearCookie } from "../core/http-client.js";
+import { saveCookie, getCookie, clearCookie, lockLoginGate, unlockLoginGate } from "../core/http-client.js";
 
 // ========== 类型 ==========
 
@@ -49,46 +49,53 @@ function buildLoginForm(): URLSearchParams {
  * 2. POST {routes.login} 提交登录表单
  */
 export async function login(): Promise<LoginResult> {
-  // 1. 获取 guest cookie
-  const r1 = await axios.get(`${forum.base_url}${routes.index}`, {
-    headers: http.headers,
-    responseType: "arraybuffer",
-    timeout: http.timeout_ms,
-  });
-  saveCookie(r1);
-
-  // 2. AJAX 登录
-  const formData = buildLoginForm();
-
-  const r2 = await axios.post(
-    `${forum.base_url}${routes.login}`,
-    formData.toString(),
-    {
-      headers: {
-        ...http.headers,
-        "Content-Type": "application/x-www-form-urlencoded",
-        "X-Requested-With": "XMLHttpRequest",
-        Accept: "application/json",
-        Cookie: getCookie(),
-      },
-      responseType: "json",
+  // 获取登录闸门：登录期间独占所有 ajaxGet/ajaxPost（防止旧 cookie 请求的
+  // 响应 Set-Cookie 覆盖登录态，见 http-client.ts 登录闸门注释）。
+  lockLoginGate();
+  try {
+    // 1. 获取 guest cookie
+    const r1 = await axios.get(`${forum.base_url}${routes.index}`, {
+      headers: http.headers,
+      responseType: "arraybuffer",
       timeout: http.timeout_ms,
-      validateStatus: () => true,
-    },
-  );
-  saveCookie(r2);
+    });
+    saveCookie(r1);
 
-  const data = r2.data as {
-    ajax_st: number;
-    user_name?: string;
-    is_login?: boolean;
-  };
+    // 2. AJAX 登录
+    const formData = buildLoginForm();
 
-  return {
-    ajaxSt: data.ajax_st,
-    userName: data.user_name,
-    isLogin: data.is_login ?? false,
-  };
+    const r2 = await axios.post(
+      `${forum.base_url}${routes.login}`,
+      formData.toString(),
+      {
+        headers: {
+          ...http.headers,
+          "Content-Type": "application/x-www-form-urlencoded",
+          "X-Requested-With": "XMLHttpRequest",
+          Accept: "application/json",
+          Cookie: getCookie(),
+        },
+        responseType: "json",
+        timeout: http.timeout_ms,
+        validateStatus: () => true,
+      },
+    );
+    saveCookie(r2);
+
+    const data = r2.data as {
+      ajax_st: number;
+      user_name?: string;
+      is_login?: boolean;
+    };
+
+    return {
+      ajaxSt: data.ajax_st,
+      userName: data.user_name,
+      isLogin: data.is_login ?? false,
+    };
+  } finally {
+    unlockLoginGate();
+  }
 }
 
 /** 检查是否已登录，未登录则抛出明确错误 */
